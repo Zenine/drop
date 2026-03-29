@@ -1,11 +1,12 @@
 /**
- * Markdown renderer using markdown-it with shiki code highlighting.
+ * Markdown renderer using markdown-it with highlight.js code highlighting.
  */
 
 import MarkdownIt from 'markdown-it';
+import hljs from 'highlight.js';
 import { readFileSync } from 'fs';
 import { getFileMeta } from '../../shared/fs.js';
-import { highlightCode, getShikiDualCss } from './code.js';
+import { getHighlightCss } from './code.js';
 import { markdownPageHtml } from './html-templates.js';
 
 let md: MarkdownIt | null = null;
@@ -18,7 +19,12 @@ function getMd(): MarkdownIt {
     linkify: true,
     typographer: false,
     highlight(str: string, lang: string): string {
-      return highlightCode(str, lang);
+      if (lang && hljs.getLanguage(lang)) {
+        try {
+          return '<pre class="hljs"><code>' + hljs.highlight(str, { language: lang }).value + '</code></pre>';
+        } catch {}
+      }
+      return '<pre class="hljs"><code>' + hljs.highlightAuto(str).value + '</code></pre>';
     },
   });
 
@@ -74,7 +80,7 @@ export function renderMarkdown(filepath: string, head?: number | null, tail?: nu
     .replace(/<\/table>/g, '</table></div>');
 
   const meta = getFileMeta(filepath);
-  const pygmentsCss = getShikiDualCss();
+  const pygmentsCss = getHighlightCss();
 
   return markdownPageHtml({
     displayPath: meta.display_path,

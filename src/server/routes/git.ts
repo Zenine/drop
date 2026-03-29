@@ -8,7 +8,7 @@ import { STATUS_NOT_FOUND, STATUS_EXPIRED } from '../../shared/constants.js';
 import { displayPath, htmlEscape } from '../../shared/utils.js';
 import { handleExpired } from '../middleware/auth.js';
 import { gitPageHtml } from '../render/html-templates.js';
-import { highlightCode, getShikiDualCss } from '../render/code.js';
+import { highlightCode, getHighlightCss } from '../render/code.js';
 
 const gitRoutes = new Hono();
 
@@ -37,14 +37,14 @@ gitRoutes.get('/git/:token', (c) => {
     return c.text(`Failed to read git commit: ${e.message}`, 500);
   }
 
-  const pygmentsCss = getShikiDualCss();
+  const pygmentsCss = getHighlightCss();
 
   const filesHtml: string[] = [];
   for (const f of info.files) {
     const stats = `+${f.added} -${f.deleted}`;
     let diffHighlighted: string;
     if (f.diff) {
-      diffHighlighted = highlightCode(f.diff, 'diff');
+      diffHighlighted = '<pre class="hljs"><code class="hljs">' + highlightCode(f.diff, 'diff') + '</code></pre>';
     } else {
       diffHighlighted = '<pre>No diff available</pre>';
     }

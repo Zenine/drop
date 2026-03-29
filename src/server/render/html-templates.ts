@@ -100,29 +100,28 @@ export function codePageHtml(opts: CodePageOpts): string {
     overflow-x: auto;
   }
   ${opts.highlightCss}
-  .shiki {
+  .hljs {
     background: var(--bg) !important;
     padding: 0;
   }
-  .shiki code {
+  pre.hljs, pre code.hljs {
     display: block;
     padding: 12px 16px;
     margin: 0;
     font-family: var(--font-mono);
     font-size: 14px;
-    line-height: 1.65;
+    line-height: 1;
     white-space: pre-wrap;
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
-  .shiki .line { display: block; }
   @media (max-width: 768px) {
     .file-header {
       padding: 10px 12px;
     }
-    .shiki code {
+    pre.hljs, pre code.hljs {
       font-size: 13px;
-      line-height: 1.5;
+      line-height: 1;
       padding: 8px 12px;
     }
   }`,
@@ -258,23 +257,17 @@ export function markdownPageHtml(opts: MarkdownPageOpts): string {
     font-size: 14px;
   }
   ${opts.pygmentsCss}
-  .shiki {
-    background: var(--bg-secondary) !important;
-    margin: 0;
-    border-radius: 0;
-  }
-  .shiki code {
+  pre.hljs, .markdown-body pre code.hljs {
     display: block;
     padding: 16px;
     margin: 0;
     font-family: var(--font-mono);
     font-size: 14px;
-    line-height: 1.6;
+    line-height: 1.3;
     white-space: pre;
     overflow-x: auto;
-    color: var(--text);
+    background: var(--bg-secondary) !important;
   }
-  .shiki .line { display: block; }
   .file-footer {
     max-width: 860px;
     margin: 0 auto;
@@ -568,25 +561,24 @@ export function gitPageHtml(opts: GitPageOpts): string {
     overflow-x: auto;
   }
   ${opts.pygmentsCss}
-  .shiki {
+  .hljs {
     background: var(--bg) !important;
     padding: 0;
   }
-  .shiki code {
+  pre.hljs, pre code.hljs {
     display: block;
     padding: 10px 20px;
     margin: 0;
     font-family: var(--font-mono);
     font-size: 13px;
-    line-height: 1.55;
+    line-height: 1;
     white-space: pre-wrap;
     word-wrap: break-word;
   }
-  .shiki .line { display: block; }
   @media (max-width: 768px) {
     .commit-header { padding: 12px 16px; }
     .file-list summary { padding: 8px 12px; }
-    .shiki code { font-size: 12px; padding: 8px 12px; }
+    pre.hljs, pre code.hljs { font-size: 12px; padding: 8px 12px; }
   }`,
     body: `
   <div class="commit-header">

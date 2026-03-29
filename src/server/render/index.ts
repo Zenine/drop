@@ -7,13 +7,12 @@ import { readFileSync, statSync } from 'fs';
 import { extname, basename } from 'path';
 import { getFileType, getFileMeta } from '../../shared/fs.js';
 import { htmlEscape } from '../../shared/utils.js';
-import { renderCode, highlightCode, getShikiDualCss } from './code.js';
+import { renderCode, highlightCode, getHighlightCss } from './code.js';
 import { renderMarkdown } from './markdown.js';
 import { renderCsv } from './csv.js';
 import { mediaPageHtml } from './html-templates.js';
 
-export { initHighlighter } from './code.js';
-export { highlightCode, getShikiDualCss } from './code.js';
+export { highlightCode, getHighlightCss } from './code.js';
 
 const AUDIO_EXTS = new Set(['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.opus', '.weba']);
 
