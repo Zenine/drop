@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { DirEntry } from '../lib/types';
-  import { fileIcon } from '../lib/icons';
+  import { getFileIcon } from '../lib/icons';
   import { formatSize } from '../lib/format';
+  import { slide } from 'svelte/transition';
+  import { quintOut } from 'svelte/easing';
   import FileTreeItem from './FileTreeItem.svelte';
 
   interface Props {
@@ -84,12 +86,13 @@
       aria-expanded={effectiveOpen}
       aria-selected={false}
       tabindex={0}
+      data-path={entry.rel_path}
     >
-      <span class="icon">{effectiveOpen ? '\u25bc' : '\u25b6'}</span>
+      <span class="icon icon-svg">{@html getFileIcon(entry.name, true, effectiveOpen)}</span>
       <span class="name">{entry.name}</span>
     </div>
     {#if effectiveOpen}
-      <div class="tree-group open">
+      <div class="tree-group open" transition:slide={{ duration: 150, easing: quintOut }}>
         {#each entry.children as child (child.rel_path)}
           <FileTreeItem
             entry={child}
@@ -116,7 +119,7 @@
       aria-selected={isActive}
       tabindex={0}
     >
-      <span class="icon">{fileIcon(entry.name)}</span>
+      <span class="icon icon-svg">{@html getFileIcon(entry.name)}</span>
       <span class="name">{entry.name}</span>
       <span class="size">{formatSize(entry.size)}</span>
     </div>

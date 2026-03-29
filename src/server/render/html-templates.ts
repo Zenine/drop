@@ -611,20 +611,77 @@ export interface ExpiredPageOpts {
 
 export function expiredPageHtml(opts: ExpiredPageOpts): string {
   const unlockHtml = opts.verifyUrl
-    ? `<a class="unlock" href="${opts.verifyUrl}">Unlock with password</a>`
+    ? `<a class="unlock" href="${opts.verifyUrl}">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M8 1a4 4 0 00-4 4v2H3a1 1 0 00-1 1v6a1 1 0 001 1h10a1 1 0 001-1V8a1 1 0 00-1-1h-1V5a4 4 0 00-4-4zm2.5 6H5.5V5a2.5 2.5 0 015 0v2z"/></svg>
+        Unlock with password
+      </a>`
     : '';
   return baseHtml({
     title: 'File Expired',
+    extraCssDark: `--bg-pattern: rgba(255,255,255,0.02);`,
+    extraCssLight: `--bg-pattern: rgba(0,0,0,0.02);`,
     extraCss: `
-  body { display: flex; align-items: center; justify-content: center; }
-  .container { max-width: 400px; width: 100%; padding: 32px 16px; text-align: center; }
-  h1 { font-size: 1.3em; color: var(--text-header); margin-bottom: 8px; }
-  p { color: var(--text-muted); font-size: 14px; }
-  .unlock { display: inline-block; margin-top: 24px; background: #4a9eff; color: #fff;
-    text-decoration: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 500; }
-  .unlock:hover { background: #3a8eef; }`,
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-image: radial-gradient(circle at 25% 25%, var(--bg-pattern) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .container {
+    max-width: 420px;
+    width: 100%;
+    padding: 40px 24px;
+    text-align: center;
+  }
+  .lock-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+  h1 {
+    font-size: 1.4em;
+    color: var(--text-header);
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+  p {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  p strong {
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  .unlock {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 28px;
+    background: #4a9eff;
+    color: #fff;
+    text-decoration: none;
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.15s, box-shadow 0.15s;
+    box-shadow: 0 2px 8px rgba(74,158,255,0.3);
+  }
+  .unlock:hover {
+    background: #3a8eef;
+    box-shadow: 0 4px 12px rgba(74,158,255,0.4);
+  }`,
     body: `
 <div class="container">
+  <div class="lock-icon">
+    <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="8" y="22" width="32" height="20" rx="3" fill="currentColor" opacity="0.15" stroke="currentColor"/>
+      <path d="M14 22V16a10 10 0 0120 0v6"/>
+      <circle cx="24" cy="33" r="3" fill="currentColor"/>
+    </svg>
+  </div>
   <h1>This file is no longer available</h1>
   <p><strong>${opts.filename}</strong> has expired and can no longer be accessed.</p>
   ${unlockHtml}
@@ -861,13 +918,21 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
     --bg-hover: #2a2d2e;
     --bg-active: #37373d;
     --text-dim: #6a6a6a;
-    --accent: #4a9eff;`,
+    --accent: #4a9eff;
+    --shadow-sidebar: rgba(0,0,0,0.3);
+    --shadow-header: rgba(0,0,0,0.2);
+    --skeleton-base: #333;
+    --skeleton-shine: #444;`,
     extraCssLight: `
     --bg-sidebar: #f3f3f3;
     --bg-hover: #e8e8e8;
     --bg-active: #d6d6d6;
     --text-dim: #999;
-    --accent: #0969da;`,
+    --accent: #0969da;
+    --shadow-sidebar: rgba(0,0,0,0.1);
+    --shadow-header: rgba(0,0,0,0.08);
+    --skeleton-base: #e0e0e0;
+    --skeleton-shine: #f0f0f0;`,
     extraCss: `
   html, body { height: 100%; overflow: hidden; }
   body {
@@ -891,6 +956,8 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
     gap: 12px;
     flex-shrink: 0;
     min-height: 44px;
+    box-shadow: 0 1px 3px var(--shadow-header);
+    z-index: 10;
   }
   .header-title {
     font-size: 14px;
@@ -913,13 +980,20 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
     flex: 1;
     overflow: hidden;
   }
+  .layout.fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: var(--bg);
+  }
 
   /* Sidebar */
   .sidebar {
     width: 260px;
     min-width: 260px;
     background: var(--bg-sidebar);
-    border-right: 1px solid var(--border);
+    border-right: none;
+    box-shadow: 1px 0 3px var(--shadow-sidebar);
     overflow-y: auto;
     overflow-x: hidden;
     flex-shrink: 0;
@@ -928,7 +1002,7 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
   .sidebar::-webkit-scrollbar-track { background: transparent; }
   .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   .search-box {
-    padding: 8px 8px 4px;
+    padding: 10px 16px 6px;
     position: sticky;
     top: 0;
     background: var(--bg-sidebar);
@@ -936,39 +1010,65 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
   }
   .search-box input {
     width: 100%;
-    padding: 5px 8px;
+    padding: 6px 10px;
     font-size: 12px;
     font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 8px;
     outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
-  .search-box input:focus { border-color: var(--accent); }
+  .search-box input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
   .search-box input::placeholder { color: var(--text-dim); }
 
   .tree-item {
     display: flex;
     align-items: center;
-    padding: 3px 8px;
+    padding: 6px 16px;
     cursor: pointer;
     font-size: 13px;
     color: var(--text);
     white-space: nowrap;
     user-select: none;
-    border-radius: 0;
+    border-radius: 4px;
+    margin: 0 4px;
     text-decoration: none;
+    transition: background 0.1s;
   }
   .tree-item:hover { background: var(--bg-hover); }
-  .tree-item.active { background: var(--bg-active); }
+  .tree-item.active {
+    background: var(--bg-active);
+    border-left: 3px solid var(--accent);
+    padding-left: 13px;
+  }
+  .tree-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
   .tree-item .icon {
     width: 16px;
+    height: 16px;
     flex-shrink: 0;
     text-align: center;
     font-size: 11px;
     color: var(--text-muted);
-    margin-right: 4px;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tree-item .icon-svg {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tree-item .icon-svg svg {
+    display: block;
   }
   .tree-item .name {
     overflow: hidden;
@@ -982,8 +1082,22 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
     font-family: var(--font-mono);
     flex-shrink: 0;
   }
-  .tree-group { display: none; }
   .tree-group.open { display: block; }
+
+  /* Resize handle */
+  .resize-handle {
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    flex-shrink: 0;
+    transition: background 0.15s, width 0.15s;
+    z-index: 5;
+  }
+  .resize-handle:hover, .resize-handle.resizing {
+    width: 4px;
+    background: var(--accent);
+    opacity: 0.4;
+  }
 
   /* Preview */
   .preview {
@@ -995,19 +1109,99 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
   .preview-empty {
     flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     color: var(--text-muted);
     font-size: 14px;
+    gap: 8px;
   }
+  .empty-icon {
+    color: var(--text-dim);
+    opacity: 0.5;
+    margin-bottom: 8px;
+  }
+  .empty-main {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  .empty-sub {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* Skeleton loading */
   .preview-loading {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-muted);
-    font-size: 13px;
   }
+  .skeleton-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 300px;
+    max-width: 80%;
+  }
+  .skeleton-bar {
+    height: 14px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-shine) 50%, var(--skeleton-base) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Preview header bar */
+  .preview-header-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border);
+  }
+  .preview-header-bar .breadcrumb {
+    flex: 1;
+    border-bottom: none;
+    min-width: 0;
+  }
+  .file-info {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    padding-right: 8px;
+  }
+  .fullscreen-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .fullscreen-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+
+  /* Preview content fade container */
+  .preview-content-fade {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   .preview-frame {
     flex: 1;
     border: none;
@@ -1028,7 +1222,7 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
-    border-radius: 4px;
+    border-radius: 6px;
   }
   .preview-binary {
     flex: 1;
@@ -1049,12 +1243,16 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
     background: var(--accent);
     color: #fff;
     text-decoration: none;
-    padding: 8px 20px;
-    border-radius: 6px;
+    padding: 10px 24px;
+    border-radius: 8px;
     font-size: 13px;
     font-weight: 500;
+    transition: box-shadow 0.15s, opacity 0.15s;
   }
-  .preview-binary .dl-btn:hover { opacity: 0.9; }
+  .preview-binary .dl-btn:hover {
+    opacity: 0.9;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
 
   /* Mobile */
   .sidebar-toggle {
@@ -1072,55 +1270,102 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
     position: fixed;
     inset: 0;
     top: 44px;
-    background: rgba(0,0,0,0.4);
+    background: rgba(0,0,0,0);
     z-index: 99;
     -webkit-tap-highlight-color: transparent;
+    transition: background 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .sidebar-overlay.visible { display: block; }
+  .sidebar-overlay.visible {
+    display: block;
+    background: rgba(0,0,0,0.4);
+  }
+
+  /* Mobile bottom nav */
+  .mobile-bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: var(--bg-header);
+    border-top: 1px solid var(--border);
+    z-index: 150;
+    justify-content: space-around;
+    align-items: center;
+  }
+  .mobile-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    padding: 6px 16px;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.15s;
+  }
+  .mobile-tab.active {
+    color: var(--accent);
+  }
+
   @media (max-width: 768px) {
-    .sidebar-toggle { display: block; }
+    .sidebar-toggle { display: none; }
+    .resize-handle { display: none; }
+    .mobile-bottom-nav { display: flex; }
+
     .sidebar {
       position: fixed;
       left: 0;
       top: 44px;
-      bottom: 0;
-      width: 280px;
-      min-width: 280px;
+      bottom: 56px;
+      width: 100% !important;
+      min-width: 100% !important;
       z-index: 100;
       transform: translateX(-100%);
-      transition: transform 0.2s ease;
-      box-shadow: 2px 0 12px rgba(0,0,0,0.4);
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: none;
     }
-    .sidebar.mobile-open {
+    .sidebar.mobile-open, .sidebar.mobile-files {
       transform: translateX(0);
     }
+
+    .preview {
+      padding-bottom: 56px;
+    }
+
     /* Larger touch targets on mobile */
     .tree-item {
-      padding: 8px 12px;
+      padding: 8px 16px;
       font-size: 14px;
+      margin: 0;
     }
     .tree-item .icon {
       width: 20px;
-      font-size: 13px;
-      margin-right: 6px;
+      height: 20px;
+      margin-right: 8px;
     }
     .tree-item .size {
       font-size: 12px;
     }
     .search-box {
-      padding: 10px 10px 6px;
+      padding: 10px 16px 6px;
     }
     .search-box input {
-      padding: 8px 10px;
+      padding: 8px 12px;
       font-size: 14px;
-      border-radius: 6px;
+      border-radius: 8px;
     }
     /* Preview padding for mobile */
     .preview-image {
       padding: 12px;
     }
     .preview-image img {
-      border-radius: 2px;
+      border-radius: 4px;
     }
     .breadcrumb {
       padding: 6px 12px;
@@ -1155,6 +1400,35 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .breadcrumb-sep {
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .breadcrumb-segment {
+    flex-shrink: 0;
+  }
+  .breadcrumb-link {
+    background: none;
+    border: none;
+    font: inherit;
+    color: var(--link);
+    cursor: pointer;
+    padding: 0;
+    text-decoration: none;
+  }
+  .breadcrumb-link:hover {
+    text-decoration: underline;
+  }
+  .breadcrumb-current {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .breadcrumb-root {
+    color: var(--text-muted);
   }
   ${_svelteCss}`,
     body: `
