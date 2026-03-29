@@ -189,6 +189,10 @@ program
       }
     }
 
+    // Initialize shiki highlighter before starting server
+    const { initHighlighter } = await import('../server/render/index.js');
+    await initHighlighter();
+
     const { app } = await import('../server/index.js');
     console.log(`vibefs serving on http://${host}:${port} (pid ${process.pid})`);
     Bun.serve({
