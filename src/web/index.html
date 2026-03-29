@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>vibefs dev</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // Dev mode: provide mock data
+    window.__VIBEFS__ = {
+      token: 'devtoken123',
+      dirname: 'test-dir',
+      tree: { name: 'test-dir', rel_path: '', is_dir: true, size: 0, children: [
+        { name: 'readme.md', rel_path: 'readme.md', is_dir: false, size: 1024, children: [] },
+        { name: 'src', rel_path: 'src', is_dir: true, size: 0, children: [
+          { name: 'index.ts', rel_path: 'src/index.ts', is_dir: false, size: 512, children: [] },
+        ]},
+      ]},
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      initialFile: '',
+      basePath: '',
+    };
+  </script>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

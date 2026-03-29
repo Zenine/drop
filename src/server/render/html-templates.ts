@@ -3,6 +3,9 @@
  * Ported from Python Jinja2 templates — same CSS, same structure.
  */
 
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
 export interface BaseHtmlOpts {
   title: string;
   extraCssDark?: string;
@@ -819,7 +822,38 @@ export interface DirBrowserShellOpts {
   treeJson: string;
 }
 
+// Cache the built Svelte assets at module load time
+let _svelteJs = '';
+let _svelteCss = '';
+
+function loadSvelteAssets() {
+  if (_svelteJs) return;
+
+  // import.meta.dir is the directory of this file (Bun-specific)
+  // Go up from src/server/render/ to project root, then into dist/web
+  let distDir: string;
+  if (typeof import.meta.dir === 'string') {
+    distDir = join(import.meta.dir, '..', '..', '..', 'dist', 'web');
+  } else {
+    distDir = join(process.cwd(), 'dist', 'web');
+  }
+
+  try {
+    _svelteJs = readFileSync(join(distDir, 'app.js'), 'utf-8');
+    try {
+      _svelteCss = readFileSync(join(distDir, 'app.css'), 'utf-8');
+    } catch {
+      _svelteCss = ''; // No separate CSS file is fine — may be bundled in JS
+    }
+  } catch {
+    _svelteJs = 'console.error("Svelte assets not built. Run: bun run build:web")';
+    _svelteCss = '';
+  }
+}
+
 export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
+  loadSvelteAssets();
+
   return baseHtml({
     title: `${opts.dirname} \u2014 vibefs`,
     extraCssDark: `
@@ -839,6 +873,12 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
   body {
     display: flex;
     flex-direction: column;
+  }
+  #app {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
   }
 
   /* Header */
@@ -907,8 +947,6 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
   }
   .search-box input:focus { border-color: var(--accent); }
   .search-box input::placeholder { color: var(--text-dim); }
-  .tree-item.search-hidden { display: none; }
-  .tree-group.search-force-open { display: block; }
 
   .tree-item {
     display: flex;
@@ -1117,374 +1155,18 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }`,
+  }
+  ${_svelteCss}`,
     body: `
-  <div class="header">
-    <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">&#9776;</button>
-    <span class="header-title">${opts.dirname}</span>
-    <span class="header-meta">expires in <span class="countdown" id="countdown"></span></span>
-  </div>
-  <div class="layout">
-    <div class="sidebar-overlay" id="sidebar-overlay"></div>
-    <nav class="sidebar" id="sidebar">
-      <div class="search-box"><input type="text" id="search" placeholder="Filter files&hellip;" autocomplete="off" spellcheck="false"></div>
-      <div id="tree-container"></div>
-    </nav>
-    <main class="preview" id="preview">
-      <div class="preview-empty">Select a file to preview</div>
-    </main>
-  </div>
-
-<script>
-(function() {
-  var TREE = ${opts.treeJson};
-  var TOKEN = '${opts.token}';
-  var EXPIRES = ${opts.expiresAt};
-  var INITIAL_FILE = '${opts.initialFile}';
-  var BASE = '${opts.basePath}';
-
-  var activeEl = null;
-  var currentFile = null;
-
-  function updateCountdown() {
-    var now = Date.now() / 1000;
-    var remaining = Math.max(0, EXPIRES - now);
-    if (remaining <= 0) {
-      document.getElementById('countdown').textContent = 'expired';
-      return;
-    }
-    var h = Math.floor(remaining / 3600);
-    var m = Math.floor((remaining % 3600) / 60);
-    var s = Math.floor(remaining % 60);
-    var parts = [];
-    if (h > 0) parts.push(h + 'h');
-    if (m > 0 || h > 0) parts.push(m + 'm');
-    parts.push(s + 's');
-    document.getElementById('countdown').textContent = parts.join(' ');
-  }
-  updateCountdown();
-  setInterval(updateCountdown, 1000);
-
-  function fmtSize(n) {
-    if (n < 1024) return n + ' B';
-    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
-    if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
-    return (n / 1073741824).toFixed(1) + ' GB';
-  }
-
-  function fileIcon(name) {
-    var ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
-    var m = {md:'\\ud83d\\udcdd',txt:'\\ud83d\\udcc4',json:'\\ud83d\\udccb',yaml:'\\ud83d\\udccb',yml:'\\ud83d\\udccb',toml:'\\ud83d\\udccb',py:'\\ud83d\\udc0d',js:'\\ud83d\\udcdc',ts:'\\ud83d\\udcdc',go:'\\ud83d\\udd35',rs:'\\ud83e\\udd80',rb:'\\ud83d\\udc8e',html:'\\ud83c\\udf10',css:'\\ud83c\\udfa8',svg:'\\ud83c\\udfa8',png:'\\ud83d\\uddbc',jpg:'\\ud83d\\uddbc',jpeg:'\\ud83d\\uddbc',gif:'\\ud83d\\uddbc',webp:'\\ud83d\\uddbc',avif:'\\ud83d\\uddbc',sh:'\\u26a1',bash:'\\u26a1',zsh:'\\u26a1'};
-    return m[ext] || '\\ud83d\\udcc4';
-  }
-
-  function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  var sidebar = document.getElementById('sidebar');
-  var treeContainer = document.getElementById('tree-container');
-  function renderTree(node, container, depth) {
-    if (!node.children) return;
-    node.children.forEach(function(child) {
-      var item = document.createElement('div');
-      item.className = 'tree-item';
-      item.style.paddingLeft = (8 + depth * 16) + 'px';
-
-      if (child.is_dir) {
-        var group = document.createElement('div');
-        group.className = 'tree-group';
-        item.innerHTML = '<span class="icon">\\u25b6</span><span class="name">' + escHtml(child.name) + '</span>';
-        item.onclick = function(e) {
-          e.stopPropagation();
-          var open = group.classList.toggle('open');
-          item.querySelector('.icon').textContent = open ? '\\u25bc' : '\\u25b6';
-        };
-        container.appendChild(item);
-        container.appendChild(group);
-        renderTree(child, group, depth + 1);
-      } else {
-        item.innerHTML = '<span class="icon">' + fileIcon(child.name) + '</span>'
-          + '<span class="name">' + escHtml(child.name) + '</span>'
-          + '<span class="size">' + fmtSize(child.size) + '</span>';
-        item.dataset.path = child.rel_path;
-        item.onclick = function(e) {
-          e.stopPropagation();
-          selectFile(child.rel_path, item);
-        };
-        item.onmouseenter = (function(p) { return function() { prefetch(p); }; })(child.rel_path);
-        container.appendChild(item);
-      }
-    });
-  }
-
-  renderTree(TREE, treeContainer, 0);
-
-  // File search/filter
-  var searchInput = document.getElementById('search');
-  searchInput.addEventListener('input', function() {
-    var q = searchInput.value.toLowerCase().trim();
-    var items = treeContainer.querySelectorAll('.tree-item');
-    var groups = treeContainer.querySelectorAll('.tree-group');
-
-    if (!q) {
-      for (var i = 0; i < items.length; i++) items[i].classList.remove('search-hidden');
-      for (var i = 0; i < groups.length; i++) groups[i].classList.remove('search-force-open');
-      return;
-    }
-
-    var matchedGroups = new Set();
-    for (var i = 0; i < items.length; i++) {
-      var item = items[i];
-      var nameEl = item.querySelector('.name');
-      if (!nameEl) continue;
-      var isFile = !!item.dataset.path;
-      if (isFile && nameEl.textContent.toLowerCase().indexOf(q) !== -1) {
-        item.classList.remove('search-hidden');
-        var parent = item.parentElement;
-        while (parent && parent !== treeContainer) {
-          if (parent.classList.contains('tree-group')) matchedGroups.add(parent);
-          parent = parent.parentElement;
-        }
-      } else if (isFile) {
-        item.classList.add('search-hidden');
-      } else {
-        item.classList.add('search-hidden');
-      }
-    }
-
-    for (var i = 0; i < groups.length; i++) {
-      if (matchedGroups.has(groups[i])) {
-        groups[i].classList.add('search-force-open');
-        var prev = groups[i].previousElementSibling;
-        if (prev && prev.classList.contains('tree-item')) prev.classList.remove('search-hidden');
-      } else {
-        groups[i].classList.remove('search-force-open');
-      }
-    }
-  });
-
-  // --- Prefetch cache ---
-  var _cache = {};
-  var _inflight = {};
-  var API_BASE = BASE + '/d/' + TOKEN + '/api/file?path=';
-
-  function fetchFile(relPath) {
-    if (_cache[relPath]) return Promise.resolve(_cache[relPath]);
-    if (_inflight[relPath]) return _inflight[relPath];
-    var p = fetch(API_BASE + encodeURIComponent(relPath))
-      .then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function(data) { _cache[relPath] = data; delete _inflight[relPath]; return data; })
-      .catch(function(err) { delete _inflight[relPath]; throw err; });
-    _inflight[relPath] = p;
-    return p;
-  }
-
-  function prefetch(relPath) {
-    if (!_cache[relPath] && !_inflight[relPath]) fetchFile(relPath);
-  }
-
-  function patchIframeLinks(iframe, currentRelPath) {
-    var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-    if (!iframeDoc) return;
-    var links = iframeDoc.querySelectorAll('a[href]');
-    var currentDir = currentRelPath.indexOf('/') !== -1 ? currentRelPath.substring(0, currentRelPath.lastIndexOf('/') + 1) : '';
-    for (var i = 0; i < links.length; i++) {
-      (function(link) {
-        var href = link.getAttribute('href');
-        if (!href || href.startsWith('http://') || href.startsWith('https://') || href.startsWith('#') || href.startsWith('mailto:')) return;
-        var resolved = href.replace(/^\\.\\//,  '');
-        var parts = (currentDir + resolved).split('/');
-        var normalized = [];
-        for (var j = 0; j < parts.length; j++) {
-          if (parts[j] === '..') { if (normalized.length) normalized.pop(); }
-          else if (parts[j] && parts[j] !== '.') normalized.push(parts[j]);
-        }
-        var targetPath = normalized.join('/');
-        link.style.cursor = 'pointer';
-        link.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          var items = document.querySelectorAll('.tree-item[data-path]');
-          var targetEl = null;
-          for (var k = 0; k < items.length; k++) {
-            if (items[k].dataset.path === targetPath) { targetEl = items[k]; break; }
-          }
-          selectFile(targetPath, targetEl);
-        });
-      })(links[i]);
-    }
-  }
-
-  function renderPreview(data, relPath) {
-    var bc = '<div class="breadcrumb">' + breadcrumb(relPath) + '</div>';
-    if (data.type === 'html') {
-      return bc + '<iframe class="preview-frame" sandbox="allow-same-origin" data-srcdoc></iframe>';
-    } else if (data.type === 'image') {
-      return bc + '<div class="preview-image"><img src="' + escHtml(data.url) + '" alt="' + escHtml(relPath) + '"></div>';
-    } else if (data.type === 'pdf') {
-      return bc + '<iframe class="preview-frame" src="' + escHtml(data.url) + '" style="border:none"></iframe>';
-    } else if (data.type === 'media') {
-      var ext = relPath.split('.').pop().toLowerCase();
-      var isAudio = ['mp3','wav','ogg','flac','aac','m4a','opus','weba'].indexOf(ext) !== -1;
-      var tag = isAudio ? 'audio' : 'video';
-      return bc + '<div class="preview-image"><' + tag + ' controls style="max-width:100%;max-height:70vh">'
-        + '<source src="' + escHtml(data.url) + '"></' + tag + '></div>';
-    } else {
-      return bc + '<div class="preview-binary">'
-        + '<div class="filename">' + escHtml(data.filename) + '</div>'
-        + '<div>' + fmtSize(data.size) + '</div>'
-        + '<a class="dl-btn" href="' + escHtml(data.url) + '" download>Download</a></div>';
-    }
-  }
-
-  function findTreeNode(relPath) {
-    if (!relPath) return TREE;
-    var parts = relPath.split('/');
-    var node = TREE;
-    for (var i = 0; i < parts.length; i++) {
-      var found = false;
-      for (var j = 0; j < (node.children || []).length; j++) {
-        if (node.children[j].name === parts[i]) {
-          node = node.children[j];
-          found = true;
-          break;
-        }
-      }
-      if (!found) return null;
-    }
-    return node;
-  }
-
-  function expandDir(relPath) {
-    var parts = relPath.split('/');
-    var current = treeContainer;
-    for (var i = 0; i < parts.length; i++) {
-      var items = current.querySelectorAll(':scope > .tree-item');
-      for (var j = 0; j < items.length; j++) {
-        var nameEl = items[j].querySelector('.name');
-        if (nameEl && nameEl.textContent === parts[i]) {
-          var group = items[j].nextElementSibling;
-          if (group && group.classList.contains('tree-group')) {
-            group.classList.add('open');
-            items[j].querySelector('.icon').textContent = '\\u25bc';
-            current = group;
-          }
-          break;
-        }
-      }
-    }
-    var lastItems = current.querySelectorAll(':scope > .tree-item');
-    if (lastItems.length > 0) lastItems[0].scrollIntoView({ block: 'center' });
-  }
-
-  function selectFile(relPath, el) {
-    var node = findTreeNode(relPath);
-    if (node && node.is_dir) {
-      expandDir(relPath);
-      return;
-    }
-
-    if (currentFile === relPath) return;
-    currentFile = relPath;
-
-    if (activeEl) activeEl.classList.remove('active');
-    if (el) { el.classList.add('active'); activeEl = el; }
-
-    closeSidebar();
-
-    var preview = document.getElementById('preview');
-    var newUrl = BASE + '/d/' + TOKEN + '/' + relPath;
-    history.pushState({ file: relPath }, '', newUrl);
-
-    if (_cache[relPath]) {
-      preview.innerHTML = renderPreview(_cache[relPath], relPath);
-      if (_cache[relPath].type === 'html') {
-        var f = preview.querySelector('iframe');
-        f.srcdoc = _cache[relPath].content;
-        f.onload = function() { patchIframeLinks(f, relPath); };
-      }
-      return;
-    }
-
-    preview.innerHTML = '<div class="preview-loading">Loading\\u2026</div>';
-
-    fetchFile(relPath)
-      .then(function(data) {
-        if (currentFile !== relPath) return;
-        preview.innerHTML = renderPreview(data, relPath);
-        if (data.type === 'html') {
-          var f2 = preview.querySelector('iframe');
-          f2.srcdoc = data.content;
-          f2.onload = function() { patchIframeLinks(f2, relPath); };
-        }
-      })
-      .catch(function(err) {
-        if (currentFile !== relPath) return;
-        preview.innerHTML = '<div class="preview-empty">Failed to load: ' + escHtml(relPath) + '</div>';
-      });
-  }
-
-  function breadcrumb(relPath) {
-    var parts = relPath.split('/');
-    var html = escHtml(TREE.name);
-    for (var i = 0; i < parts.length - 1; i++) {
-      html += ' / ' + escHtml(parts[i]);
-    }
-    html += ' / ' + escHtml(parts[parts.length - 1]);
-    return html;
-  }
-
-  function closeSidebar() {
-    document.getElementById('sidebar').classList.remove('mobile-open');
-    document.getElementById('sidebar-overlay').classList.remove('visible');
-  }
-  window.toggleSidebar = function() {
-    var sidebar = document.getElementById('sidebar');
-    var overlay = document.getElementById('sidebar-overlay');
-    var isOpen = sidebar.classList.toggle('mobile-open');
-    if (isOpen) {
-      overlay.classList.add('visible');
-    } else {
-      overlay.classList.remove('visible');
-    }
-  };
-  document.getElementById('sidebar-overlay').addEventListener('click', closeSidebar);
-
-  function navigateToFile(relPath) {
-    if (!relPath) return;
-    var parts = relPath.split('/');
-    if (parts.length > 1) {
-      expandDir(parts.slice(0, -1).join('/'));
-    }
-    var fileItems = treeContainer.querySelectorAll('.tree-item[data-path]');
-    for (var k = 0; k < fileItems.length; k++) {
-      if (fileItems[k].dataset.path === relPath) {
-        selectFile(relPath, fileItems[k]);
-        fileItems[k].scrollIntoView({ block: 'center' });
-        return;
-      }
-    }
-    var node = findTreeNode(relPath);
-    if (node && node.is_dir) expandDir(relPath);
-  }
-
-  if (INITIAL_FILE) {
-    navigateToFile(INITIAL_FILE);
-  }
-
-  window.addEventListener('popstate', function() {
-    var prefix = BASE + '/d/' + TOKEN + '/';
-    var path = window.location.pathname;
-    if (path.indexOf(prefix) === 0) {
-      var relPath = decodeURIComponent(path.substring(prefix.length));
-      if (relPath) {
-        currentFile = '';
-        navigateToFile(relPath);
-      }
-    }
-  });
-})();
-</script>`,
+  <div id="app"></div>
+  <script>window.__VIBEFS__ = {
+    token: "${opts.token}",
+    dirname: "${opts.dirname}",
+    tree: ${opts.treeJson},
+    expiresAt: ${opts.expiresAt},
+    initialFile: "${opts.initialFile}",
+    basePath: "${opts.basePath}"
+  };</script>
+  <script>${_svelteJs}</script>`,
   });
 }
