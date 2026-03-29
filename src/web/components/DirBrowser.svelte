@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { DirEntry, FilePreviewData } from '../lib/types';
   import { fetchFile, prefetch, getCached } from '../lib/api';
-  import Countdown from './Countdown.svelte';
   import SearchBox from './SearchBox.svelte';
   import FileTree from './FileTree.svelte';
   import Preview from './Preview.svelte';
@@ -23,12 +22,9 @@
   let previewError = $state('');
   let searchQuery = $state('');
   let sidebarOpen = $state(false);
-  let sidebarWidth = $state(260);
-  let isResizing = $state(false);
-  let fullscreen = $state(false);
 
-  // Mobile bottom nav: 'preview' or 'files'
-  let mobileTab = $state<'preview' | 'files'>('preview');
+  // Mobile: 'list' | 'preview'
+  let mobileView = $state<'list' | 'preview'>('list');
 
   // Keyboard navigation
   let focusedIndex = $state(-1);
@@ -61,8 +57,8 @@
     if (currentFile === relPath) return;
     currentFile = relPath;
     closeSidebar();
-    // On mobile, switch to preview tab when file selected
-    mobileTab = 'preview';
+    // On mobile, switch to preview view when file selected
+    mobileView = 'preview';
 
     const newUrl = basePath + '/d/' + token + '/' + relPath;
     history.pushState({ file: relPath }, '', newUrl);
@@ -101,15 +97,14 @@
   }
 
   function handleExpandDir(dirPath: string) {
-    // This triggers a scroll/focus to a directory in the sidebar
-    // For now just open the sidebar on mobile
+    // On mobile, switch back to list view to show the directory
     if (window.innerWidth <= 768) {
-      mobileTab = 'files';
+      mobileView = 'list';
     }
   }
 
-  function handleToggleFullscreen() {
-    fullscreen = !fullscreen;
+  function handleMobileBack() {
+    mobileView = 'list';
   }
 
   // Handle popstate (browser back/forward)
@@ -137,17 +132,6 @@
         handleSelect(initialFile);
       });
     }
-  });
-
-  // Escape key exits fullscreen
-  $effect(() => {
-    function onKeydown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && fullscreen) {
-        fullscreen = false;
-      }
-    }
-    window.addEventListener('keydown', onKeydown);
-    return () => window.removeEventListener('keydown', onKeydown);
   });
 
   // Keyboard navigation on sidebar
@@ -197,136 +181,60 @@
     }
   }
 
-  // Resizable split pane
-  function startResize(e: MouseEvent) {
-    e.preventDefault();
-    isResizing = true;
-    const startX = e.clientX;
-    const startWidth = sidebarWidth;
-
-    function onMouseMove(ev: MouseEvent) {
-      const delta = ev.clientX - startX;
-      sidebarWidth = Math.max(180, Math.min(500, startWidth + delta));
-    }
-
-    function onMouseUp() {
-      isResizing = false;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }
-
-  // Touch swipe on preview to open files (mobile)
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let touchStartTime = 0;
-
-  function handleTouchStart(e: TouchEvent) {
-    if (window.innerWidth > 768) return;
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    touchStartTime = Date.now();
-  }
-
-  function handleTouchEnd(e: TouchEvent) {
-    if (window.innerWidth > 768) return;
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const dy = e.changedTouches[0].clientY - touchStartY;
-    const dt = Date.now() - touchStartTime;
-
-    // Swipe right to open files — horizontal > 50px, more horizontal than vertical, fast enough
-    if (dx > 50 && Math.abs(dy) < Math.abs(dx) && dt < 400) {
-      mobileTab = 'files';
-    }
-  }
+  // Get the filename from currentFile
+  let currentFileName = $derived(currentFile ? currentFile.split('/').pop() || '' : '');
 </script>
 
-{#if !fullscreen}
-  <div class="header">
-    <button class="sidebar-toggle" onclick={toggleSidebar} aria-label="Toggle sidebar">&#9776;</button>
-    <span class="header-title">{dirname}</span>
-    <span class="header-meta">expires in <Countdown {expiresAt} /></span>
-  </div>
-{/if}
-<div class="layout" class:fullscreen>
-  {#if !fullscreen}
-    <div
-      class="sidebar-overlay"
-      class:visible={sidebarOpen}
-      onclick={closeSidebar}
-      role="presentation"
-    ></div>
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <nav
-      class="sidebar"
-      class:mobile-open={sidebarOpen}
-      class:mobile-files={mobileTab === 'files'}
-      style="width: {sidebarWidth}px; min-width: {sidebarWidth}px;"
-      bind:this={sidebarEl}
-      onkeydown={handleSidebarKeydown}
-    >
-      <SearchBox bind:query={searchQuery} />
-      <FileTree
-        {tree}
-        activePath={currentFile}
-        {searchQuery}
-        onSelect={handleSelect}
-        onPrefetch={handlePrefetch}
-      />
-    </nav>
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div
-      class="resize-handle"
-      onmousedown={startResize}
-      class:resizing={isResizing}
-      role="separator"
-      aria-label="Resize sidebar"
-    ></div>
-  {/if}
-  <main
-    class="preview"
-    class:mobile-preview={mobileTab === 'preview'}
-    ontouchstart={handleTouchStart}
-    ontouchend={handleTouchEnd}
+<div class="header">
+  <button class="menu-btn" onclick={toggleSidebar} aria-label="Toggle sidebar">&#9776;</button>
+  <span class="dirname">{dirname}</span>
+  <span class="shared-badge">
+    <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 1a4 4 0 00-4 4v2H3a1 1 0 00-1 1v6a1 1 0 001 1h10a1 1 0 001-1V8a1 1 0 00-1-1h-1V5a4 4 0 00-4-4zm2.5 6H5.5V5a2.5 2.5 0 015 0v2z"/></svg>
+    shared
+  </span>
+</div>
+
+<div class="layout" class:mobile-preview={mobileView === 'preview'}>
+  <div
+    class="sidebar-overlay"
+    class:visible={sidebarOpen}
+    onclick={closeSidebar}
+    role="presentation"
+  ></div>
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <nav
+    class="sidebar"
+    class:mobile-open={sidebarOpen}
+    bind:this={sidebarEl}
+    onkeydown={handleSidebarKeydown}
   >
+    <SearchBox bind:query={searchQuery} />
+    <FileTree
+      {tree}
+      activePath={currentFile}
+      {searchQuery}
+      onSelect={handleSelect}
+      onPrefetch={handlePrefetch}
+    />
+  </nav>
+  <main class="preview-pane">
+    {#if mobileView === 'preview' && currentFile}
+      <div class="mobile-back-bar">
+        <button class="mobile-back-btn" onclick={handleMobileBack} aria-label="Back to file list">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path fill-rule="evenodd" d="M7.78 12.53a.75.75 0 01-1.06 0L2.47 8.28a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 1.06L4.81 7h7.44a.75.75 0 010 1.5H4.81l2.97 2.97a.75.75 0 010 1.06z"/></svg>
+        </button>
+        <span class="mobile-back-filename">{currentFileName}</span>
+      </div>
+    {/if}
     <Preview
       data={previewData}
       relPath={currentFile}
       {dirname}
+      {tree}
       loading={previewLoading}
       error={previewError}
       onNavigate={handleNavigate}
       onExpandDir={handleExpandDir}
-      {fullscreen}
-      onToggleFullscreen={handleToggleFullscreen}
     />
   </main>
 </div>
-
-{#if !fullscreen}
-  <div class="mobile-bottom-nav">
-    <button
-      class="mobile-tab"
-      class:active={mobileTab === 'files'}
-      onclick={() => { mobileTab = 'files'; }}
-    >
-      <svg viewBox="0 0 16 16" width="20" height="20" fill="currentColor"><path d="M1.5 2A1.5 1.5 0 000 3.5v9A1.5 1.5 0 001.5 14h13a1.5 1.5 0 001.5-1.5V5a1.5 1.5 0 00-1.5-1.5H7.71L6.15 2.22A.75.75 0 005.64 2H1.5z"/></svg>
-      <span>Files</span>
-    </button>
-    <button
-      class="mobile-tab"
-      class:active={mobileTab === 'preview'}
-      onclick={() => { mobileTab = 'preview'; }}
-    >
-      <svg viewBox="0 0 16 16" width="20" height="20" fill="currentColor"><path d="M8 3C3.6 3 .5 7.4.3 7.7a.5.5 0 000 .6C.5 8.6 3.6 13 8 13s7.5-4.4 7.7-4.7a.5.5 0 000-.6C15.5 7.4 12.4 3 8 3zm0 8.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7zM8 6a2 2 0 100 4 2 2 0 000-4z"/></svg>
-      <span>Preview</span>
-    </button>
-  </div>
-{/if}

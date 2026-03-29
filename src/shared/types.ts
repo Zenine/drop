@@ -32,6 +32,7 @@ export interface DirEntry {
   rel_path: string;
   is_dir: boolean;
   size: number;
+  mtime: number;
   children: DirEntry[];
 }
 
@@ -41,6 +42,7 @@ export interface FilePreviewResponse {
   content?: string;
   filename?: string;
   size?: number;
+  mtime?: number;
 }
 
 export interface ShareListItem {

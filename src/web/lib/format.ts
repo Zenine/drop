@@ -16,3 +16,11 @@ export function formatTime(seconds: number): string {
   parts.push(s + 's');
   return parts.join(' ');
 }
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function formatDate(epochSeconds: number): string {
+  if (!epochSeconds) return '';
+  const d = new Date(epochSeconds * 1000);
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}

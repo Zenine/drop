@@ -164,8 +164,11 @@ dirRoutes.get('/d/:token/api/file', (c) => {
   const baseUrl = ((cfg.base_url as string) || '').replace(/\/$/, '');
 
   let fileSize = 0;
+  let fileMtime = 0;
   try {
-    fileSize = statSync(absPath).size;
+    const st = statSync(absPath);
+    fileSize = st.size;
+    fileMtime = Math.floor(st.mtimeMs / 1000);
   } catch {
     // ignore
   }
@@ -173,27 +176,27 @@ dirRoutes.get('/d/:token/api/file', (c) => {
   const rawUrl = `${baseUrl}/d/${row!.token}/raw?path=${encodeURIComponent(relPath)}`;
 
   if (fileType === 'image' || fileType === 'svg') {
-    return c.json({ type: 'image', url: rawUrl });
+    return c.json({ type: 'image', url: rawUrl, size: fileSize, mtime: fileMtime });
   }
 
   if (fileType === 'pdf') {
-    return c.json({ type: 'pdf', url: rawUrl });
+    return c.json({ type: 'pdf', url: rawUrl, size: fileSize, mtime: fileMtime });
   }
 
   if ((fileType === 'code' || fileType === 'markdown' || fileType === 'csv') && fileSize <= MAX_RENDER_SIZE) {
     const renderer = getRenderer(absPath);
     if (renderer) {
       const htmlContent = renderer(absPath);
-      return c.json({ type: 'html', content: htmlContent });
+      return c.json({ type: 'html', content: htmlContent, size: fileSize, mtime: fileMtime });
     }
   }
 
   if (fileType === 'media') {
-    return c.json({ type: 'media', url: rawUrl, filename: basename(absPath), size: fileSize });
+    return c.json({ type: 'media', url: rawUrl, filename: basename(absPath), size: fileSize, mtime: fileMtime });
   }
 
   // Binary / unknown / oversized
-  return c.json({ type: 'binary', filename: basename(absPath), size: fileSize, url: rawUrl });
+  return c.json({ type: 'binary', filename: basename(absPath), size: fileSize, mtime: fileMtime, url: rawUrl });
 });
 
 // Raw file serving

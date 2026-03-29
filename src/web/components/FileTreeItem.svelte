@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { DirEntry } from '../lib/types';
   import { getFileIcon } from '../lib/icons';
-  import { formatSize } from '../lib/format';
   import { slide } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import FileTreeItem from './FileTreeItem.svelte';
@@ -121,7 +120,6 @@
     >
       <span class="icon icon-svg">{@html getFileIcon(entry.name)}</span>
       <span class="name">{entry.name}</span>
-      <span class="size">{formatSize(entry.size)}</span>
     </div>
   {/if}
 {/if}

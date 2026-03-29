@@ -8,11 +8,17 @@
   let { content, relPath, onNavigate }: Props = $props();
   let iframeEl: HTMLIFrameElement | undefined = $state();
 
-  function patchIframeLinks() {
+  function patchIframe() {
     if (!iframeEl) return;
     const iframeDoc = iframeEl.contentDocument || iframeEl.contentWindow?.document;
     if (!iframeDoc) return;
 
+    // Inject CSS to hide the file-header and file-footer (prevents double header)
+    const style = iframeDoc.createElement('style');
+    style.textContent = '.file-header, .file-footer { display: none !important; }';
+    iframeDoc.head.appendChild(style);
+
+    // Patch links for in-app navigation
     const links = iframeDoc.querySelectorAll('a[href]');
     const currentDir = relPath.includes('/')
       ? relPath.substring(0, relPath.lastIndexOf('/') + 1)
@@ -43,7 +49,7 @@
   $effect(() => {
     if (iframeEl && content) {
       iframeEl.srcdoc = content;
-      iframeEl.onload = () => patchIframeLinks();
+      iframeEl.onload = () => patchIframe();
     }
   });
 </script>

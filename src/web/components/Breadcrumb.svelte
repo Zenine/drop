@@ -1,11 +1,10 @@
 <script lang="ts">
   interface Props {
-    dirname: string;
     relPath: string;
     onExpandDir?: (dirPath: string) => void;
   }
 
-  let { dirname, relPath, onExpandDir }: Props = $props();
+  let { relPath, onExpandDir }: Props = $props();
 
   let parts = $derived(relPath.split('/'));
 
@@ -18,9 +17,10 @@
 </script>
 
 <div class="breadcrumb">
-  <span class="breadcrumb-segment breadcrumb-root">{dirname}</span>
   {#each parts as part, i}
-    <span class="breadcrumb-sep"> / </span>
+    {#if i > 0}
+      <span class="breadcrumb-sep"> / </span>
+    {/if}
     {#if i < parts.length - 1}
       <button class="breadcrumb-segment breadcrumb-link" onclick={() => handleClick(i)}>{part}</button>
     {:else}

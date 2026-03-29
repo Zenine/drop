@@ -3,6 +3,7 @@ export interface DirEntry {
   rel_path: string;
   is_dir: boolean;
   size: number;
+  mtime: number;
   children: DirEntry[];
 }
 
@@ -12,4 +13,5 @@ export interface FilePreviewData {
   content?: string;
   filename?: string;
   size?: number;
+  mtime?: number;
 }

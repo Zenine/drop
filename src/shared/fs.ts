@@ -107,6 +107,7 @@ function walkDirectoryUncached(dirpath: string, excludes: string[]): DirEntry {
             rel_path: relPath,
             is_dir: true,
             size: 0,
+            mtime: 0,
             children: subChildren,
           });
         } else {
@@ -115,8 +116,11 @@ function walkDirectoryUncached(dirpath: string, excludes: string[]): DirEntry {
             throw new Error(`Directory contains more than ${MAX_DIR_FILES} files. Use --exclude to narrow scope.`);
           }
           let size = 0;
+          let mtime = 0;
           try {
-            size = statSync(entryPath).size;
+            const st = statSync(entryPath);
+            size = st.size;
+            mtime = Math.floor(st.mtimeMs / 1000);
           } catch {
             // ignore
           }
@@ -125,6 +129,7 @@ function walkDirectoryUncached(dirpath: string, excludes: string[]): DirEntry {
             rel_path: relPath,
             is_dir: false,
             size,
+            mtime,
             children: [],
           });
         }
@@ -143,6 +148,7 @@ function walkDirectoryUncached(dirpath: string, excludes: string[]): DirEntry {
     rel_path: '',
     is_dir: true,
     size: 0,
+    mtime: 0,
     children: walk(dirpath, ''),
   };
 }
