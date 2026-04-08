@@ -24,7 +24,7 @@ export function baseHtml(opts: BaseHtmlOpts): string {
 <title>${opts.title}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@100..900&family=Google+Sans+Code:wght@100..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@100..900&family=Roboto+Mono:wght@100..700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #1e1e1e;
@@ -35,7 +35,7 @@ export function baseHtml(opts: BaseHtmlOpts): string {
     --text-muted: #888888;
     --link: #6ab0f3;
     --font-sans: 'Google Sans Flex', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-mono: 'Google Sans Code', 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+    --font-mono: 'Roboto Mono', 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
     ${opts.extraCssDark || ''}
   }
   @media (prefers-color-scheme: light) {
