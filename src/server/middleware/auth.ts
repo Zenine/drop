@@ -51,7 +51,7 @@ function verifySignedValue(signed: string, secret: string): string | null {
  */
 export function checkOwnerAuth(c: Context): boolean {
   const ownerKey = getOwnerKey();
-  const cookie = getCookie(c, 'vibefs_owner');
+  const cookie = getCookie(c, 'drop_owner');
   if (!cookie) return false;
   return verifySignedValue(cookie, ownerKey) === 'owner';
 }
@@ -62,7 +62,7 @@ export function checkOwnerAuth(c: Context): boolean {
 export function setOwnerCookie(c: Context): void {
   const ownerKey = getOwnerKey();
   const signed = signValue('owner', ownerKey);
-  setCookie(c, 'vibefs_owner', signed, {
+  setCookie(c, 'drop_owner', signed, {
     path: '/',
     maxAge: 30 * 86400,
     httpOnly: true,
@@ -74,7 +74,7 @@ export function setOwnerCookie(c: Context): void {
  * Check if request has valid auth cookie for password-protected expired shares.
  */
 export function checkExpiredAuth(c: Context, password: string): boolean {
-  const cookie = getCookie(c, 'vibefs_auth');
+  const cookie = getCookie(c, 'drop_auth');
   if (!cookie) return false;
   return verifySignedValue(cookie, password) === 'verified';
 }
@@ -84,7 +84,7 @@ export function checkExpiredAuth(c: Context, password: string): boolean {
  */
 export function setAuthCookie(c: Context, password: string): void {
   const signed = signValue('verified', password);
-  setCookie(c, 'vibefs_auth', signed, {
+  setCookie(c, 'drop_auth', signed, {
     path: '/',
     maxAge: 86400,
     httpOnly: true,

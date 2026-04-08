@@ -6,7 +6,7 @@ let db: Database | null = null;
 let dbInitialized = false;
 
 function getDbPath(): string {
-  return process.env.VIBEFS_DB || DB_PATH;
+  return process.env.DROP_DB || DB_PATH;
 }
 
 function ensureTables(database: Database): void {

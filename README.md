@@ -1,43 +1,17 @@
-# vibefs
+# drop
 
-A file and directory preview server with time-limited access control, designed for AI agents to share local files with users via URLs.
+Share files, directories, and content via time-limited preview URLs. Designed for AI agents to drop files to users in a browser.
 
-This is a full rewrite of [vibefs](https://github.com/junping1/vibefs) in TypeScript, powered by Bun, Hono, and Svelte 5.
-
-## Why the rewrite?
-
-| | Python (original) | TypeScript (this) |
-|---|---|---|
-| Runtime | Python + Waitress | Bun (single binary) |
-| Web framework | Bottle | Hono |
-| Templating | Jinja2 (server-rendered) | Svelte 5 SPA (client-rendered) |
-| Syntax highlighting | Pygments (server) | highlight.js (client) |
-| Markdown | markdown-it (server) | markdown-it (client) |
-| Directory browser | Server-rendered HTML + vanilla JS | Svelte 5 with reactive components |
-| DB | SQLite via Python stdlib | SQLite via Bun's native `bun:sqlite` |
-| Install | `uv tool install` / `pip install` | `bun install` |
-
-Key improvements:
-- **Faster startup**: Bun's native runtime vs Python interpreter
-- **Better directory browser**: Svelte 5 SPA with animations, split pane, responsive mobile nav
-- **Client-side rendering**: Syntax highlighting and markdown rendering happen in the browser, reducing server load
-- **Single runtime**: No need for Python + pip/uv — just Bun
+Built with Bun, Hono, and Svelte 5. A TypeScript rewrite of [vibefs](https://github.com/junping1/vibefs).
 
 ## Install
 
 Requires [Bun](https://bun.sh/) v1.0+.
 
 ```bash
-# Clone and install dependencies
-git clone https://github.com/junping1/vibefs-next.git
-cd vibefs-next
+git clone https://github.com/junping1/drop.git
+cd drop
 bun install
-
-# Run directly
-bun run src/cli/index.ts --help
-
-# Or link globally
-bun link
 ```
 
 ## Usage
@@ -45,41 +19,46 @@ bun link
 ### Share a file
 
 ```bash
-vibefs allow /path/to/file.py
+drop allow /path/to/file.py
 # http://localhost:17173/f/a3b7c2d1
 
-vibefs allow /path/to/file.py --ttl 300    # 5 minutes
-vibefs allow /path/to/file.py --head 50    # Only first 50 lines
-vibefs allow /path/to/file.py --tail 20    # Only last 20 lines
-vibefs allow /path/to/file.py --live       # Auto-refresh on file changes
-vibefs allow /path/to/file.py --json       # Output URL as JSON
+drop allow /path/to/file.py --ttl 300     # 5 minutes
+drop allow /path/to/file.py --head 50     # Only first 50 lines
+drop allow /path/to/file.py --tail 20     # Only last 20 lines
+drop allow /path/to/file.py --live        # Auto-refresh on file changes
+drop allow /path/to/file.py --json        # Output URL as JSON
 ```
+
+The daemon starts automatically if it's not already running.
 
 ### Share a directory
 
 ```bash
-vibefs allow ~/project/
+drop allow ~/project/
 # http://localhost:17173/d/a3b7c2d1e5f6
 
-vibefs allow ~/project/ --ttl 7200               # 2 hours (default: 3 hours)
-vibefs allow ~/project/ --exclude '*.log'         # Exclude log files
-vibefs allow ~/project/ --live                    # Auto-refresh on changes
+drop allow ~/project/ --ttl 7200               # 2 hours (default: 3 hours)
+drop allow ~/project/ --exclude '*.log'         # Exclude log files
+drop allow ~/project/ --live                    # Auto-refresh on changes
 ```
 
 Directory shares open a Svelte 5 SPA with:
 - Sidebar file tree with expand/collapse animations
 - Split-pane preview: code (highlight.js), markdown (rendered), images, PDF, audio/video
-- File search
+- File search within the directory
 - Deep linking: `/d/<token>/path/to/file`
 - Responsive mobile layout with slide-out navigation
 - Breadcrumb navigation
 
+Default excludes: `.git/`, `__pycache__/`, `.env`, `node_modules/`, `.DS_Store`, `*.pyc`, `.venv/`
+
 ### Share content from stdin
 
 ```bash
-echo "# Hello" | vibefs share --type markdown
-git diff | vibefs share --type diff --title "my changes"
-vibefs share --content "print('hi')" --type python
+echo "# Hello" | drop share --type markdown
+git diff | drop share --type diff --title "my changes"
+drop share --content "print('hi')" --type python
+cat data.csv | drop share --type text --ttl 7200
 ```
 
 Supported types: `markdown`, `python`, `javascript`, `json`, `yaml`, `html`, `css`, `shell`, `diff`, `code`, `text`
@@ -87,137 +66,165 @@ Supported types: `markdown`, `python`, `javascript`, `json`, `yaml`, `html`, `cs
 ### Share a git commit
 
 ```bash
-vibefs allow-git /path/to/repo abc1234
-vibefs allow-git . HEAD
+drop allow-git /path/to/repo abc1234
+drop allow-git . HEAD              # Current commit in current repo
+drop allow-git . HEAD --ttl 300
 ```
+
+Renders commit metadata, file list, and expandable diffs with syntax highlighting.
 
 ### Manage shares
 
 ```bash
-vibefs list                  # List all active shares
-vibefs list --json           # Output as JSON
-vibefs revoke <token>        # Revoke a share
+drop list                  # List all active shares
+drop list --json           # Output as JSON array
+drop revoke <token>        # Revoke a specific share
 ```
 
 ### Owner dashboard
 
 ```bash
-vibefs owner-url             # Print dashboard URL with auto-generated key
+drop owner-url             # Print dashboard URL with auto-generated key
 ```
+
+The dashboard shows all shares and lets you manage them. Visit the URL once to set a 30-day cookie, then `/dashboard` works without the key.
 
 ### Server control
 
 ```bash
-vibefs status                # Check daemon status
-vibefs stop                  # Stop daemon
-vibefs serve                 # Start in foreground
-vibefs serve --tunnel        # Start with Cloudflare Quick Tunnel
+drop status                # Check if daemon is running
+drop status --json         # Output as JSON
+drop stop                  # Stop the daemon
+drop serve                 # Start server in foreground
+drop serve --tunnel        # Start with a Cloudflare Quick Tunnel
 ```
 
 ### Configuration
 
 ```bash
-vibefs config set base_url https://files.example.com
-vibefs config set file_ttl 43200
-vibefs config set port 8080
+drop config set base_url https://files.example.com
+drop config get base_url
+
+drop config set file_ttl 43200          # 12 hours for files (default: 3600)
+drop config set dir_default_ttl 21600   # 6 hours for directories (default: 10800)
+drop config set port 8080               # Default: 17173
+drop config set auto_stop true          # Stop daemon when all shares expire
 ```
+
+When `base_url` is set, generated URLs use it instead of `localhost:port`.
+
+## File rendering
+
+| Type | Rendering |
+|------|-----------|
+| Code (`.py`, `.js`, `.ts`, `.go`, `.rs`, etc.) | Syntax highlighting via highlight.js (client-side) |
+| Markdown (`.md`) | Rendered HTML with theme/font controls and reading progress |
+| CSV/TSV (`.csv`, `.tsv`) | Styled HTML table |
+| PDF (`.pdf`) | Browser's native PDF viewer |
+| SVG (`.svg`) | Inline SVG rendering |
+| Audio (`.mp3`, `.wav`, `.ogg`, `.flac`, etc.) | HTML5 audio player |
+| Video (`.mp4`, `.webm`, `.mov`, etc.) | HTML5 video player |
+| Images | Displayed inline |
+| Git commits | Metadata + expandable syntax-highlighted diffs |
+| Other | Served with original content-type |
+
+## Security
+
+- **Access control**: Nothing accessible until explicitly authorized with a TTL
+- **Token entropy**: 8 hex chars (files), 12 hex chars (directories), 32 hex chars (owner key)
+- **Rate limiting**: 60 requests/min per IP
+- **Path traversal**: Strict prefix checks, symlink validation
+- **Anti-crawler**: `robots.txt`, `X-Robots-Tag`, `noindex` meta tags
+- **Owner auth**: HMAC-signed cookies, timing-safe key comparison, httponly/samesite
+- **Large files**: >5MB served as download
 
 ## Architecture
 
 ```
 src/
-├── cli/
-│   └── index.ts              # CLI (Commander.js) + daemon management
+├── cli/index.ts              # CLI (Commander.js) + daemon management
 ├── db/
-│   ├── index.ts              # bun:sqlite database setup
+│   ├── index.ts              # bun:sqlite database
 │   ├── authorizations.ts     # File share CRUD
 │   ├── dir-authorizations.ts # Directory share CRUD
 │   ├── git-authorizations.ts # Git commit share CRUD
 │   └── cleanup.ts            # Expired share cleanup
 ├── server/
-│   ├── index.ts              # Hono app setup + middleware
-│   ├── middleware/
-│   │   ├── auth.ts           # Owner authentication
-│   │   ├── rate-limit.ts     # 60 req/min per IP
-│   │   └── security.ts       # Security headers, anti-crawler
-│   ├── render/
-│   │   ├── index.ts          # Renderer registry
-│   │   ├── code.ts           # Code with highlight.js
-│   │   ├── csv.ts            # CSV/TSV tables
-│   │   ├── markdown.ts       # Markdown rendering
-│   │   └── html-templates.ts # HTML page templates
-│   └── routes/
-│       ├── file.ts           # /f/:token
-│       ├── dir.ts            # /d/:token
-│       ├── git.ts            # /git/:token
-│       ├── dashboard.ts      # /dashboard
-│       ├── owner.ts          # /owner/auth
-│       ├── verify.ts         # /verify
-│       └── live.ts           # WebSocket live reload
-├── shared/
-│   ├── config.ts             # Config load/save, owner key
-│   ├── constants.ts          # Token lengths, TTLs, limits
-│   ├── fs.ts                 # File system utilities
-│   ├── types.ts              # Shared TypeScript types
-│   └── utils.ts              # Path display, escaping
+│   ├── index.ts              # Hono app + middleware
+│   ├── middleware/            # Auth, rate limiting, security headers
+│   ├── render/               # Code, CSV, markdown, HTML templates
+│   └── routes/               # /f/, /d/, /git/, /dashboard, /verify, /live
+├── shared/                   # Config, constants, types, utilities
 └── web/                      # Svelte 5 SPA (directory browser)
-    ├── App.svelte
-    ├── main.ts
-    ├── components/
-    │   ├── DirBrowser.svelte   # Main directory browser
-    │   ├── FileTree.svelte     # Sidebar file tree
-    │   ├── FileTreeItem.svelte # Recursive tree node
-    │   ├── SearchBox.svelte    # File search
-    │   ├── Breadcrumb.svelte   # Path breadcrumbs
-    │   ├── Preview.svelte      # Preview router
-    │   ├── CodePreview.svelte  # highlight.js code preview
-    │   ├── ImagePreview.svelte
-    │   ├── PdfPreview.svelte
-    │   ├── MediaPreview.svelte # Audio/video
-    │   └── BinaryPreview.svelte
-    └── lib/
-        ├── api.ts              # Fetch helpers
-        ├── format.ts           # File size/date formatting
-        ├── icons.ts            # SVG file type icons
-        └── types.ts            # Frontend types
+    ├── components/           # DirBrowser, FileTree, Preview, Search, etc.
+    └── lib/                  # API helpers, formatting, icons, types
 ```
 
-## Security
+### Tech stack
 
-Same security model as the Python version:
-- Nothing accessible until explicitly authorized with a TTL
-- Token entropy: 8 hex (files), 12 hex (dirs), 32 hex (owner)
-- Rate limiting: 60 req/min per IP
-- Path traversal protection
-- Anti-crawler headers
-- Constant-time owner key comparison
-- httponly cookies for owner auth
+| Layer | Technology |
+|-------|-----------|
+| Runtime | [Bun](https://bun.sh/) |
+| Web framework | [Hono](https://hono.dev/) |
+| Frontend | [Svelte 5](https://svelte.dev/) |
+| Syntax highlighting | [highlight.js](https://highlightjs.org/) (client-side) |
+| Markdown | [markdown-it](https://github.com/markdown-it/markdown-it) |
+| Database | SQLite via `bun:sqlite` |
+| CLI | [Commander.js](https://github.com/tj/commander.js) |
+| Build | [Vite](https://vite.dev/) |
 
 ## Development
 
 ```bash
-# Start server in foreground
-bun run dev:serve
-
-# Build Svelte frontend
-bun run build:web
-
-# Dev mode for Svelte (HMR)
-bun run dev:web
+bun run dev:serve          # Start server in foreground
+bun run build:web          # Build Svelte frontend
+bun run dev:web            # Svelte dev mode with HMR
 ```
 
 ## State
 
-All runtime data in `~/.vibefs/` (shared with the Python version):
+All runtime data in `~/.drop/`:
 
 | File | Purpose |
 |------|---------|
-| `vibefs.db` | Authorization records (SQLite) |
-| `vibefs.pid` | Daemon PID |
-| `vibefs.log` | Daemon logs |
+| `drop.db` | Authorization records (SQLite) |
+| `drop.pid` | Daemon PID |
+| `drop.log` | Daemon logs |
 | `config.json` | Configuration |
-| `shares/` | Temporary files from `vibefs share` |
+| `shares/` | Temporary files from `drop share` |
 | `tunnel_url` | Active tunnel URL |
+
+## Deploy
+
+```bash
+# Built-in Cloudflare Quick Tunnel (no account needed)
+drop serve --tunnel
+
+# Or use any tunneling service
+cloudflared tunnel --url http://localhost:17173
+ngrok http 17173
+tailscale funnel 17173
+
+# Then set the base URL
+drop config set base_url https://your-domain.com
+```
+
+## Agent integration
+
+Add to your AI agent's system prompt:
+
+```
+You have access to `drop`, a file sharing tool.
+
+To share a file or directory:
+    drop allow /path/to/file_or_dir [--ttl SECONDS] [--live]
+
+To share piped content:
+    echo "content" | drop share --type markdown
+
+This prints a URL. Send it to the user — they can view the file in a browser.
+Links expire after the TTL (default: 1 hour for files, 3 hours for directories).
+```
 
 ## License
 

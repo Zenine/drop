@@ -70,7 +70,7 @@ function startDaemon(port: number, host: string): void {
   // Give it a moment to start
   setTimeout(() => {
     if (proc.exitCode !== null) {
-      console.error('Warning: daemon process exited immediately, check ~/.vibefs/vibefs.log');
+      console.error('Warning: daemon process exited immediately, check ~/.drop/drop.log');
     } else {
       console.error(`Daemon started (pid ${proc.pid})`);
     }
@@ -160,8 +160,8 @@ function setNested(cfg: Record<string, any>, key: string, value: string): void {
 
 const program = new Command();
 program
-  .name('vibefs')
-  .description('vibefs — Vibe File Server\n\nShare files, directories, and content via time-limited preview URLs.')
+  .name('drop')
+  .description('drop — Share files, directories, and content via time-limited preview URLs.')
   .version('1.0.0');
 
 // serve
@@ -190,7 +190,7 @@ program
     }
 
     const { app } = await import('../server/index.js');
-    console.log(`vibefs serving on http://${host}:${port} (pid ${process.pid})`);
+    console.log(`drop serving on http://${host}:${port} (pid ${process.pid})`);
     Bun.serve({
       port,
       hostname: host,
@@ -296,7 +296,7 @@ program
       }
     } else {
       console.error('Error: provide --content or pipe data via stdin');
-      console.error('  echo "content" | vibefs share --type markdown');
+      console.error('  echo "content" | drop share --type markdown');
       process.exit(1);
     }
 

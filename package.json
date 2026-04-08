@@ -1,9 +1,9 @@
 {
-  "name": "vibefs",
+  "name": "drop",
   "version": "1.0.0",
   "type": "module",
   "bin": {
-    "vibefs": "./src/cli/index.ts"
+    "drop": "./src/cli/index.ts"
   },
   "scripts": {
     "dev": "bun run src/cli/index.ts",

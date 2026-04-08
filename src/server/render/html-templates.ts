@@ -1,5 +1,5 @@
 /**
- * HTML templates for vibefs renderers.
+ * HTML templates for drop renderers.
  * Ported from Python Jinja2 templates — same CSS, same structure.
  */
 
@@ -106,11 +106,11 @@ export function codePageHtml(opts: CodePageOpts): string {
   }
   pre.hljs, pre code.hljs {
     display: block;
-    padding: 12px 16px;
+    padding: 12px 16px !important;
     margin: 0;
     font-family: var(--font-mono);
     font-size: 14px;
-    line-height: 1;
+    line-height: 1.4;
     white-space: pre-wrap;
     word-wrap: break-word;
     overflow-wrap: break-word;
@@ -121,7 +121,7 @@ export function codePageHtml(opts: CodePageOpts): string {
     }
     pre.hljs, pre code.hljs {
       font-size: 13px;
-      line-height: 1;
+      line-height: 1.4;
       padding: 8px 12px;
     }
   }`,
@@ -181,7 +181,7 @@ export function markdownPageHtml(opts: MarkdownPageOpts): string {
   .markdown-body h4, .markdown-body h5, .markdown-body h6 {
     color: var(--text);
     font-weight: 600;
-    line-height: 1.25;
+    line-height: 1.4;
     margin-top: 24px;
     margin-bottom: 12px;
   }
@@ -246,7 +246,7 @@ export function markdownPageHtml(opts: MarkdownPageOpts): string {
     border-radius: 4px;
   }
   .markdown-body pre {
-    margin-bottom: 16px;
+    margin: 24px 0;
     border-radius: 6px;
     overflow: hidden;
   }
@@ -259,14 +259,15 @@ export function markdownPageHtml(opts: MarkdownPageOpts): string {
   ${opts.pygmentsCss}
   pre.hljs, .markdown-body pre code.hljs {
     display: block;
-    padding: 16px;
+    padding: 14px 16px !important;
     margin: 0;
     font-family: var(--font-mono);
     font-size: 14px;
-    line-height: 1.3;
+    line-height: 1.4;
     white-space: pre;
     overflow-x: auto;
     background: var(--bg-secondary) !important;
+    border-radius: 6px;
   }
   .file-footer {
     max-width: 860px;
@@ -567,11 +568,11 @@ export function gitPageHtml(opts: GitPageOpts): string {
   }
   pre.hljs, pre code.hljs {
     display: block;
-    padding: 10px 20px;
+    padding: 10px 20px !important;
     margin: 0;
     font-family: var(--font-mono);
     font-size: 13px;
-    line-height: 1;
+    line-height: 1.4;
     white-space: pre-wrap;
     word-wrap: break-word;
   }
@@ -762,7 +763,7 @@ export function dashboardPageHtml(opts: DashboardPageOpts): string {
   }
 
   return baseHtml({
-    title: 'Dashboard \u2014 vibefs',
+    title: 'Dashboard \u2014 drop',
     extraCssDark: `
     --bg-row: #252526;
     --bg-row-hover: #2a2d2e;
@@ -855,7 +856,7 @@ export function dashboardPageHtml(opts: DashboardPageOpts): string {
   }`,
     body: `
   <div class="page-header">
-    <h1>vibefs dashboard</h1>
+    <h1>drop dashboard</h1>
     <div class="subtitle">${opts.shareCount} shares (${opts.activeCount} active)</div>
   </div>
   ${tableBody}`,
@@ -904,7 +905,7 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
   loadSvelteAssets();
 
   return baseHtml({
-    title: `${opts.dirname} \u2014 vibefs`,
+    title: `${opts.dirname} \u2014 drop`,
     extraCssDark: `
     --bg-sidebar: #252526;
     --bg-hover: #2a2d2e;
@@ -1391,7 +1392,7 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
   ${_svelteCss}`,
     body: `
   <div id="app"></div>
-  <script>window.__VIBEFS__ = {
+  <script>window.__DROP__ = {
     token: "${opts.token}",
     dirname: "${opts.dirname}",
     tree: ${opts.treeJson},

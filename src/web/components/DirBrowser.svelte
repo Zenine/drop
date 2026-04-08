@@ -50,18 +50,19 @@
     sidebarOpen = !sidebarOpen;
   }
 
-  function handleSelect(relPath: string) {
+  function loadFile(relPath: string, pushHistory = true) {
     const node = findTreeNode(relPath);
     if (node && node.is_dir) return;
 
     if (currentFile === relPath) return;
     currentFile = relPath;
     closeSidebar();
-    // On mobile, switch to preview view when file selected
     mobileView = 'preview';
 
-    const newUrl = basePath + '/d/' + token + '/' + relPath;
-    history.pushState({ file: relPath }, '', newUrl);
+    if (pushHistory) {
+      const newUrl = basePath + '/d/' + token + '/' + relPath;
+      history.pushState({ file: relPath }, '', newUrl);
+    }
 
     const cached = getCached(relPath);
     if (cached) {
@@ -88,12 +89,16 @@
       });
   }
 
+  function handleSelect(relPath: string) {
+    loadFile(relPath, true);
+  }
+
   function handlePrefetch(relPath: string) {
     prefetch(token, basePath, relPath);
   }
 
   function handleNavigate(targetPath: string) {
-    handleSelect(targetPath);
+    loadFile(targetPath, true);
   }
 
   function handleExpandDir(dirPath: string) {
@@ -115,8 +120,15 @@
       if (path.indexOf(prefix) === 0) {
         const relPath = decodeURIComponent(path.substring(prefix.length));
         if (relPath) {
+          currentFile = ''; // reset so loadFile doesn't skip
+          loadFile(relPath, false); // don't push state — we're responding to a pop
+        } else {
+          // User went back to the root directory view (no file selected)
           currentFile = '';
-          handleSelect(relPath);
+          previewData = null;
+          previewLoading = false;
+          previewError = '';
+          mobileView = 'list';
         }
       }
     }

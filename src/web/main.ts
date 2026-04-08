@@ -1,7 +1,7 @@
 import { mount } from 'svelte';
 import App from './App.svelte';
 
-interface VibeFSConfig {
+interface DropConfig {
   token: string;
   dirname: string;
   tree: any;
@@ -12,11 +12,11 @@ interface VibeFSConfig {
 
 declare global {
   interface Window {
-    __VIBEFS__: VibeFSConfig;
+    __DROP__: DropConfig;
   }
 }
 
-const config = window.__VIBEFS__;
+const config = window.__DROP__;
 
 mount(App, {
   target: document.getElementById('app')!,

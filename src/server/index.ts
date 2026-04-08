@@ -16,7 +16,7 @@ app.use('*', rateLimitMiddleware);
 app.use('*', securityMiddleware);
 
 // Health check / root
-app.get('/', (c) => c.text('vibefs running'));
+app.get('/', (c) => c.text('drop running'));
 
 // robots.txt
 app.get('/robots.txt', (c) => {

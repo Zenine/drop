@@ -25,10 +25,10 @@ export const MAX_DIR_FILES = 10000;
 export const MAX_RENDER_SIZE = 5 * 1024 * 1024; // 5 MB
 export const CLEANUP_INTERVAL = 60; // seconds between auto-stop checks
 
-export const STATE_DIR = join(homedir(), '.vibefs');
-export const DB_PATH = join(STATE_DIR, 'vibefs.db');
-export const PID_PATH = join(STATE_DIR, 'vibefs.pid');
-export const LOG_PATH = join(STATE_DIR, 'vibefs.log');
+export const STATE_DIR = join(homedir(), '.drop');
+export const DB_PATH = join(STATE_DIR, 'drop.db');
+export const PID_PATH = join(STATE_DIR, 'drop.pid');
+export const LOG_PATH = join(STATE_DIR, 'drop.log');
 export const CONFIG_PATH = join(STATE_DIR, 'config.json');
 export const SHARES_DIR = join(STATE_DIR, 'shares');
 export const TUNNEL_URL_PATH = join(STATE_DIR, 'tunnel_url');
