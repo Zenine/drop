@@ -1,10 +1,25 @@
 # drop
 
-Share files, directories, and content via time-limited preview URLs. Designed for AI agents to drop files to users in a browser.
+Share files and directories via time-limited preview URLs. Single binary, no dependencies.
 
-Built with Bun, Hono, and Svelte 5. A TypeScript rewrite of [vibefs](https://github.com/junping1/vibefs).
+```bash
+drop ~/project/                    # share a directory (browsable UI)
+drop ~/file.py                     # share a file (syntax highlighted)
+drop ~/file.py --ttl 1800          # expires in 30 minutes
+echo "hello" | drop share          # share from stdin
+```
 
 ## Install
+
+```bash
+# One-line install (Linux/macOS)
+curl -fsSL https://raw.githubusercontent.com/junping1/drop/master/install.sh | bash
+
+# Or download manually from GitHub Releases
+# https://github.com/junping1/drop/releases
+```
+
+### Build from source
 
 Requires [Bun](https://bun.sh/) v1.0+.
 
@@ -12,32 +27,32 @@ Requires [Bun](https://bun.sh/) v1.0+.
 git clone https://github.com/junping1/drop.git
 cd drop
 bun install
+bun run build            # produces dist/drop-linux-x64
+cp dist/drop-linux-x64 ~/.local/bin/drop
 ```
 
 ## Usage
 
-### Share a file
-
 ```bash
-drop allow /path/to/file.py
-# http://localhost:17173/f/a3b7c2d1
-
-drop allow /path/to/file.py --ttl 300     # 5 minutes
-drop allow /path/to/file.py --head 50     # Only first 50 lines
-drop allow /path/to/file.py --tail 20     # Only last 20 lines
-drop allow /path/to/file.py --live        # Auto-refresh on file changes
-drop allow /path/to/file.py --json        # Output URL as JSON
+drop ~/file.py                     # share a file
+drop ~/project/                    # share a directory
+drop ~/file.py --ttl 300           # 5 minutes
+drop ~/file.py --head 50           # only first 50 lines
+drop ~/file.py --live              # auto-refresh on changes
+drop ~/file.py --json              # output URL as JSON
 ```
+
+The `allow` subcommand is implicit — `drop ~/file.py` is the same as `drop allow ~/file.py`.
 
 The daemon starts automatically if it's not already running.
 
 ### Share a directory
 
 ```bash
-drop allow ~/project/
+drop ~/project/
 # http://localhost:17173/d/a3b7c2d1e5f6
 
-drop allow ~/project/ --ttl 7200               # 2 hours (default: 3 hours)
+drop ~/project/ --ttl 7200               # 2 hours (default: 3 hours)
 drop allow ~/project/ --exclude '*.log'         # Exclude log files
 drop allow ~/project/ --live                    # Auto-refresh on changes
 ```
@@ -217,7 +232,7 @@ Add to your AI agent's system prompt:
 You have access to `drop`, a file sharing tool.
 
 To share a file or directory:
-    drop allow /path/to/file_or_dir [--ttl SECONDS] [--live]
+    drop /path/to/file_or_dir [--ttl SECONDS] [--live]
 
 To share piped content:
     echo "content" | drop share --type markdown

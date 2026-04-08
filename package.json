@@ -9,6 +9,7 @@
     "dev": "bun run src/cli/index.ts",
     "dev:serve": "bun run src/cli/index.ts serve --foreground",
     "build:web": "vite build",
+    "build": "bun run scripts/build.ts",
     "dev:web": "vite dev"
   },
   "dependencies": {

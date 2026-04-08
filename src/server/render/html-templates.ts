@@ -879,8 +879,17 @@ let _svelteCss = '';
 function loadSvelteAssets() {
   if (_svelteJs) return;
 
-  // import.meta.dir is the directory of this file (Bun-specific)
-  // Go up from src/server/render/ to project root, then into dist/web
+  // Try embedded assets first (compiled binary)
+  try {
+    const embedded = require('../../../dist/generated/embedded-assets.ts');
+    if (embedded.SVELTE_JS) {
+      _svelteJs = embedded.SVELTE_JS;
+      _svelteCss = embedded.SVELTE_CSS || '';
+      return;
+    }
+  } catch { /* not compiled — fall through to disk */ }
+
+  // Dev mode: read from dist/web/ on disk
   let distDir: string;
   if (typeof import.meta.dir === 'string') {
     distDir = join(import.meta.dir, '..', '..', '..', 'dist', 'web');
@@ -893,7 +902,7 @@ function loadSvelteAssets() {
     try {
       _svelteCss = readFileSync(join(distDir, 'app.css'), 'utf-8');
     } catch {
-      _svelteCss = ''; // No separate CSS file is fine — may be bundled in JS
+      _svelteCss = '';
     }
   } catch {
     _svelteJs = 'console.error("Svelte assets not built. Run: bun run build:web")';

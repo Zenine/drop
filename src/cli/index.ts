@@ -544,4 +544,11 @@ configCmd
     }
   });
 
+// Default command: if first arg looks like a path (not a known subcommand), treat as `drop allow <path>`
+const knownCommands = program.commands.map(c => c.name());
+const firstArg = process.argv[2];
+if (firstArg && !firstArg.startsWith('-') && !knownCommands.includes(firstArg)) {
+  process.argv.splice(2, 0, 'allow');
+}
+
 program.parse();
