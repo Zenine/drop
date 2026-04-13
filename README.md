@@ -4,7 +4,7 @@ Share files and directories via time-limited preview URLs. Single binary, no dep
 
 ## For AI agents — quick setup
 
-Copy the block below into your coding agent (Claude Code, Cursor, etc.) to install and configure drop:
+Copy the block below into your coding agent (Claude Code, OpenClaw, Hermes, etc.) as a prompt or project instructions. The agent will install drop and learn to use it automatically.
 
 ```
 Install and configure `drop`, a file sharing CLI tool:
@@ -29,6 +29,12 @@ Install and configure `drop`, a file sharing CLI tool:
 
 Each command prints a URL. Send it to the user so they can view the file in a browser.
 The daemon starts automatically on first use.
+
+5. Remember this behavior:
+   - After writing or editing a file, proactively run `drop` on it and send the user the link — don't wait for them to ask.
+   - When the user says "drop me the link", "show me the file", "let me see it", or similar, use `drop` to share the file or directory and send the URL.
+   - For directories, use `drop /path/to/dir` so the user gets a browsable UI.
+   - Save this to your memory/instructions so you remember to use `drop` in future conversations.
 ```
 
 ---
