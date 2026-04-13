@@ -4,7 +4,7 @@ import { homedir } from 'os';
 
 export const DEFAULT_PORT = 17173;
 export const DEFAULT_HOST = '0.0.0.0';
-export const DEFAULT_TTL = 3600; // 1 hour
+export const DEFAULT_TTL = 86400; // 1 day
 export const TOKEN_LENGTH = 4; // bytes, produces 8 hex chars
 export const TIME_FORMAT = '%Y-%m-%d %H:%M'; // strftime-style, used via formatTime()
 
@@ -16,7 +16,7 @@ export const STATUS_ACTIVE = 'active' as const;
 
 export const DIR_TOKEN_LENGTH = 6; // bytes, produces 12 hex chars
 export const OWNER_KEY_LENGTH = 16; // bytes, produces 32 hex chars
-export const DIR_DEFAULT_TTL = 10800; // 3 hours
+export const DIR_DEFAULT_TTL = 86400; // 1 day
 export const DEFAULT_EXCLUDES = [
   '.git/', '__pycache__/', '.env', 'node_modules/',
   '.DS_Store', '*.pyc', '.venv/',
