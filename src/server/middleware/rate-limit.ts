@@ -1,6 +1,6 @@
 import type { Context, Next } from 'hono';
 
-const RATE_LIMIT = 60;
+const RATE_LIMIT = 300;
 const RATE_WINDOW = 60; // seconds
 const RATE_CLEANUP_INTERVAL = 300; // seconds
 
