@@ -2,6 +2,8 @@
 
 Share files and directories via time-limited preview URLs. Single binary, no dependencies.
 
+[简体中文](README.zh-CN.md)
+
 ## For AI agents — quick setup
 
 Copy the block below into your coding agent (Claude Code, OpenClaw, Hermes, etc.) as a prompt or project instructions. The agent will install drop and learn to use it automatically.
@@ -54,6 +56,9 @@ Use cases:
 ```bash
 # One-line install (Linux/macOS)
 curl -fsSL https://raw.githubusercontent.com/junping1/drop/master/install.sh | bash
+
+# Install from a fork or another release repository
+curl -fsSL https://raw.githubusercontent.com/owner/drop/master/install.sh | DROP_REPO=owner/drop bash
 
 # Or build from source (requires Bun v1.0+)
 git clone https://github.com/junping1/drop.git
