@@ -4,6 +4,8 @@ Share files and directories via time-limited preview URLs. Single binary, no dep
 
 [简体中文](README.zh-CN.md)
 
+![drop hero: terminal command generating a secure temporary local preview link](docs/assets/drop-hero.png)
+
 ## For AI agents — quick setup
 
 Copy the block below into your coding agent (Claude Code, OpenClaw, Hermes, etc.) as a prompt or project instructions. The agent will install drop and learn to use it automatically.
@@ -44,6 +46,8 @@ The daemon starts automatically on first use.
 ## What is drop?
 
 drop lets you share any file or directory on your machine as a preview URL with automatic expiry. It runs a local server, generates short-lived links, and renders files with syntax highlighting, markdown rendering, media players, and a full directory browser UI.
+
+![drop architecture: CLI, local state, Hono server, renderers, browser UI, and security boundaries](docs/assets/drop-architecture.png)
 
 Use cases:
 - Share code, logs, or configs with a teammate without leaving the terminal

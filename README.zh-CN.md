@@ -4,6 +4,8 @@
 
 [English](README.md)
 
+![drop hero：终端命令生成安全的临时本地预览链接](docs/assets/drop-hero.png)
+
 ## 给 AI Agent 的快速配置
 
 可以把下面这段内容复制到 Claude Code、OpenClaw、Hermes 等编码 agent 的项目说明或提示词中，让 agent 自动安装并学会使用 `drop`：
@@ -54,6 +56,8 @@ The daemon starts automatically on first use.
 - 让 AI agent 把正在编辑的文件通过浏览器链接展示给用户。
 - 临时分享一个项目目录，并让对方在网页里浏览文件树。
 - 把 `git diff` 或某个 commit 渲染成可读网页，便于审阅。
+
+![drop 架构图：CLI、本机状态、Hono 服务、渲染层、浏览器界面和安全边界](docs/assets/drop-architecture.png)
 
 ## 安装
 
