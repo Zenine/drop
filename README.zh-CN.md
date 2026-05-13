@@ -1,74 +1,176 @@
 # drop
 
-`drop` 是一个通过限时预览链接分享本地文件、目录和文本内容的命令行工具。它以单个二进制文件运行，启动本地 Web 服务，为文件生成短期 URL，并在浏览器中提供代码高亮、Markdown 渲染、媒体预览和目录浏览界面。
+简体中文 | [English](README.md)
 
-[English](README.md)
+通过带过期时间的预览 URL 分享本地文件、目录、stdin 内容和 Git diff。
 
-![drop hero：终端命令生成安全的临时本地预览链接](docs/assets/drop-hero.png)
+![drop 中文 hero 图](assets/readme/hero-zh-CN.png)
 
-## 给 AI Agent 的快速配置
+`drop` 是一个轻量 CLI 工具，用来把本机内容变成适合浏览器查看的临时预览链接。它会按需启动本地 Web 服务，把分享状态保存在 `~/.drop`，并为常见开发文件提供可读预览。
 
-可以把下面这段内容复制到 Claude Code、OpenClaw、Hermes 等编码 agent 的项目说明或提示词中，让 agent 自动安装并学会使用 `drop`：
+## 为什么用它？
 
-```text
-Install and configure `drop`, a file sharing CLI tool:
+- 不离开终端，就能分享代码、日志、配置、Markdown、CSV、媒体文件或生成产物。
+- 给 AI 编码 agent 一个稳定方式，让它展示自己创建或修改的文件。
+- 分享整个项目目录，并提供可搜索文件树和分栏预览 UI。
+- 把 Git commit 渲染成包含元数据和高亮 diff 的可读页面。
+- 默认通过 TTL 让访问自动过期。
 
-1. Install:
-   curl -fsSL https://raw.githubusercontent.com/junping1/drop/master/install.sh | bash
+## 一眼看懂
 
-2. Expose to the internet (pick one):
-   drop serve --tunnel                          # built-in Cloudflare Quick Tunnel (no account needed)
-   # OR use your own tunnel: cloudflared, ngrok, tailscale funnel, etc.
+| 需求 | 命令 |
+| --- | --- |
+| 分享单个文件 | `drop README.md` |
+| 分享可浏览目录 | `drop .` |
+| 分享终端输出 | <code>command &#124; drop share --type text</code> |
+| 从 stdin 分享 Markdown | <code>echo "# Hi" &#124; drop share --type markdown</code> |
+| 分享当前 Git diff | <code>git diff &#124; drop share --type diff</code> |
+| 分享一个 commit | `drop allow-git . HEAD` |
+| 查看活跃分享 | `drop list` |
+| 停止 daemon | `drop stop` |
 
-3. Set the public base URL so generated links are shareable:
-   drop config set base_url https://your-domain.com
+## 目录
 
-4. Usage:
-   drop /path/to/file                           # share a file (1-day default TTL)
-   drop /path/to/dir                            # share a directory with browsable UI (1-day default TTL)
-   drop /path/to/file --ttl 3600                # custom TTL in seconds
-   drop /path/to/file --live                    # auto-refresh on file changes
-   echo "content" | drop share --type markdown  # share piped content
-   drop list                                    # list active shares
+- [快速开始](#快速开始)
+- [工作原理](#工作原理)
+- [给 AI Agent 的指令块](#给-ai-agent-的指令块)
+- [安装](#安装)
+- [使用](#使用)
+- [命令](#命令)
+- [配置](#配置)
+- [渲染能力](#渲染能力)
+- [安全模型](#安全模型)
+- [公网访问](#公网访问)
+- [开发](#开发)
 
-Each command prints a URL. Send it to the user so they can view the file in a browser.
-The daemon starts automatically on first use.
+## 快速开始
 
-5. Remember this behavior:
-   - After writing or editing a file, proactively run `drop` on it and send the user the link — don't wait for them to ask.
-   - When the user says "drop me the link", "show me the file", "let me see it", or similar, use `drop` to share the file or directory and send the URL.
-   - For directories, use `drop /path/to/dir` so the user gets a browsable UI.
-   - Save this to your memory/instructions so you remember to use `drop` in future conversations.
+安装最新发布版本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/junping1/drop/master/install.sh | bash
 ```
 
-## 核心功能
+分享文件：
 
-- 分享单个文件，并生成带过期时间的预览链接。
-- 分享整个目录，提供可浏览的文件树、搜索和多类型预览。
-- 从标准输入或命令行文本创建临时分享内容。
-- 分享 Git commit diff，并以网页形式展示提交信息、文件列表和可展开 diff。
-- 通过 owner dashboard 管理活跃分享、过期分享和撤销操作。
-- 支持本地服务、Cloudflare Quick Tunnel 或任意自建公网隧道。
+```bash
+drop README.md
+```
 
-适用场景：
+分享目录：
 
-- 在终端中快速把代码、日志、配置文件发给协作者查看。
-- 让 AI agent 把正在编辑的文件通过浏览器链接展示给用户。
-- 临时分享一个项目目录，并让对方在网页里浏览文件树。
-- 把 `git diff` 或某个 commit 渲染成可读网页，便于审阅。
+```bash
+drop .
+```
 
-![drop 架构图：CLI、本机状态、Hono 服务、渲染层、浏览器界面和安全边界](docs/assets/drop-architecture.png)
+分享管道输入：
+
+```bash
+git diff | drop share --type diff --title "current changes"
+```
+
+每个命令都会打印一个 URL。你可以自己在浏览器里打开，也可以发给需要预览内容的人。
+
+## 工作原理
+
+![drop 中文架构与使用说明图](assets/readme/architecture-zh-CN.png)
+
+1. CLI 在本地 SQLite 数据库中记录授权。
+2. daemon 从你的机器上提供私有 token URL。
+3. 浏览器请求 `/f/:token`、`/d/:token` 或 `/git/:token`。
+4. 服务端检查过期时间，读取本地内容，然后返回渲染预览或原始文件。
+
+运行时状态保存在 `~/.drop/`：
+
+| 路径 | 用途 |
+| --- | --- |
+| `~/.drop/drop.db` | SQLite 授权数据库 |
+| `~/.drop/config.json` | 配置和 owner key |
+| `~/.drop/drop.pid` | daemon PID |
+| `~/.drop/drop.log` | daemon 日志 |
+| `~/.drop/shares/` | stdin 分享生成的临时文件 |
+
+## 给 AI Agent 的指令块
+
+把下面这段复制进你的编码 agent 指令，让它稳定安装并使用 `drop`：
+
+```text
+安装并使用 `drop`，一个通过限时预览 URL 分享本地文件的 CLI 工具。
+
+安装：
+  curl -fsSL https://raw.githubusercontent.com/junping1/drop/master/install.sh | bash
+
+暴露链接：
+  drop serve
+  # 如果使用外部隧道，设置公共 URL：
+  drop config set base_url https://your-domain.example
+
+使用：
+  drop /path/to/file                           # 分享文件
+  drop /path/to/dir                            # 分享可浏览目录
+  drop /path/to/file --ttl 3600                # 自定义 TTL，单位秒
+  drop /path/to/file --live                    # 文件变化时自动刷新
+  echo "content" | drop share --type markdown  # 分享管道输入
+  git diff | drop share --type diff            # 分享 diff
+  drop list                                    # 列出活跃分享
+
+行为要求：
+  - 创建或编辑了用户需要检查的文件后，对该文件运行 `drop` 并发送 URL。
+  - 当用户要求查看文件、预览内容或获取链接时，使用 `drop`。
+  - 对目录使用 `drop /path/to/dir`，让用户获得可浏览 UI。
+  - 不要分享密钥、`.env` 文件、API key、token 或凭证备份。
+```
+
+### AI 决策规则
+
+| 用户意图 | Agent 应该做什么 |
+| --- | --- |
+| “让我看看这个文件” | 运行 `drop /path/to/file` 并返回 URL。 |
+| “让我看看这个目录/项目” | 运行 `drop /path/to/dir` 并返回 URL。 |
+| “看看你的改动” | 优先运行 <code>git diff &#124; drop share --type diff --title "changes"</code>。 |
+| “分享生成的报告” | 对生成产物运行 `drop`。 |
+| “公开访问这个链接” | 先确认 tunnel/base URL，再设置 `base_url`。 |
+| 内容可能包含密钥 | 不要直接分享；先请求确认或排除敏感路径。 |
+
+机器可读摘要：
+
+```yaml
+tool: drop
+purpose: 通过临时预览 URL 分享本地内容
+default_ttl_seconds: 86400
+state_dir: ~/.drop
+share_file: drop /path/to/file
+share_directory: drop /path/to/dir
+share_stdin: command | drop share --type text
+share_diff: git diff | drop share --type diff
+list_shares: drop list
+stop_daemon: drop stop
+never_share:
+  - .env
+  - API keys
+  - OAuth credentials
+  - tokens
+  - password files
+  - database backups
+```
 
 ## 安装
 
+Linux/macOS 一行安装：
+
 ```bash
-# 一行安装，支持 Linux/macOS
 curl -fsSL https://raw.githubusercontent.com/junping1/drop/master/install.sh | bash
+```
 
-# 如果要从 fork 或其他 release 仓库安装，可以覆盖 release 仓库
+从 fork 或其他 release 仓库安装：
+
+```bash
 curl -fsSL https://raw.githubusercontent.com/owner/drop/master/install.sh | DROP_REPO=owner/drop bash
+```
 
-# 或从源码构建，需要 Bun v1.0+
+从源码构建：
+
+```bash
 git clone https://github.com/junping1/drop.git
 cd drop
 bun install
@@ -76,45 +178,54 @@ bun run build
 cp dist/drop-linux-x64 ~/.local/bin/drop
 ```
 
-## 快速使用
+源码构建需要 Bun v1.0+。
+
+## 使用
+
+`allow` 子命令是隐式的：
 
 ```bash
-drop ~/file.py                              # 分享文件
-drop ~/project/                             # 分享目录，打开可浏览 UI
-drop ~/file.py --ttl 300                    # 5 分钟后过期
-drop ~/file.py --head 50                    # 只展示前 50 行
-drop ~/file.py --tail 50                    # 只展示后 50 行
-drop ~/file.py --live                       # 文件变更后自动刷新
-echo "# Hello" | drop share --type markdown # 从 stdin 分享 Markdown
-git diff | drop share --type diff --title "my changes"
+drop ~/file.py
+drop allow ~/file.py
 ```
 
-`allow` 子命令可以省略，`drop ~/file.py` 等价于 `drop allow ~/file.py`。首次分享时，如果 daemon 还没运行，`drop` 会自动启动后台服务。
+这两个命令都会分享同一个文件。如果 daemon 尚未运行，它会自动启动。
 
-## 分享目录
+### 如何选择命令
+
+| 内容 | 推荐命令 |
+| --- | --- |
+| 已存在文件 | `drop /path/to/file` |
+| 已存在目录 | `drop /path/to/dir` |
+| 生成文本 | `drop share --content "..." --type text` |
+| 命令输出 | <code>command &#124; drop share --type text</code> |
+| Markdown 输出 | <code>command &#124; drop share --type markdown</code> |
+| 代码片段 | `drop share --content "..." --type code` |
+| Git diff | <code>git diff &#124; drop share --type diff</code> |
+| Git commit | `drop allow-git . HEAD` |
+
+### 文件
 
 ```bash
-drop ~/project/                    # 分享目录
-drop ~/project/ --ttl 7200          # 自定义过期时间
-drop ~/project/ --exclude '*.log'   # 额外排除匹配文件
-drop ~/project/ --live              # 开启 live preview
+drop ~/file.py                     # 分享文件
+drop ~/file.py --ttl 300           # 5 分钟后过期
+drop ~/file.py --head 50           # 只显示前 50 行
+drop ~/file.py --tail 50           # 只显示后 50 行
+drop ~/file.py --live              # 文件变化时刷新预览
 ```
 
-目录浏览器是一个 Svelte 5 单页应用，支持侧边栏文件树、分屏预览、代码/Markdown/图片/PDF/音视频预览、文件搜索、深链接和移动端布局。
+### 目录
 
-默认排除项包括：
-
-```text
-.git/
-__pycache__/
-.env
-node_modules/
-.DS_Store
-*.pyc
-.venv/
+```bash
+drop ~/project/                    # 分享可浏览文件树
+drop ~/project/ --ttl 7200         # 自定义 TTL
+drop ~/project/ --exclude '*.log'  # 添加排除规则
+drop ~/project/ --live             # 目录变化时刷新
 ```
 
-## 分享 stdin 或内联内容
+默认排除项：`.git/`、`__pycache__/`、`.env`、`node_modules/`、`.DS_Store`、`*.pyc`、`.venv/`。
+
+### stdin
 
 ```bash
 echo "# Hello" | drop share --type markdown
@@ -122,56 +233,34 @@ git diff | drop share --type diff --title "my changes"
 drop share --content "print('hi')" --type python
 ```
 
-支持的类型包括：
+支持的类型：`markdown`、`python`、`javascript`、`json`、`yaml`、`html`、`css`、`shell`、`diff`、`code`、`text`。
 
-```text
-markdown, python, javascript, json, yaml, html, css, shell, diff, code, text
-```
-
-stdin 内容最大限制为 10 MB。
-
-## 分享 Git Commit
+### Git Commit
 
 ```bash
 drop allow-git /path/to/repo abc1234
 drop allow-git . HEAD
 ```
 
-Git commit 页面会展示提交元数据、文件列表和带语法高亮的可展开 diff。
+Git commit 分享会渲染 commit 元数据、变更文件列表和可展开的高亮 diff。
 
-## 管理分享
+## 命令
 
-```bash
-drop list             # 查看所有分享
-drop list --json      # 输出 JSON
-drop revoke <token>   # 撤销指定 token
-drop owner-url        # 输出 owner dashboard URL
-```
-
-owner dashboard 可以查看所有分享。第一次打开 `drop owner-url` 输出的地址后，浏览器会设置 30 天有效的 owner cookie，之后直接访问 `/dashboard` 即可。owner cookie 也可以绕过所有分享的 TTL 过期限制。
-
-## 服务控制
-
-```bash
-drop status          # 查看 daemon 是否运行
-drop stop            # 停止 daemon
-drop serve           # 前台启动服务
-drop serve --tunnel  # 使用 Cloudflare Quick Tunnel 暴露公网地址
-```
-
-也可以使用任意公网隧道工具：
-
-```bash
-cloudflared tunnel --url http://localhost:17173
-ngrok http 17173
-tailscale funnel 17173
-```
-
-如果使用固定域名或公网隧道地址，建议设置 `base_url`，这样命令输出的链接就是可直接分享的公网地址：
-
-```bash
-drop config set base_url https://files.example.com
-```
+| 命令 | 说明 |
+| --- | --- |
+| `drop <path>` | 分享文件或目录 |
+| `drop allow <path>` | `drop <path>` 的显式形式 |
+| `drop share` | 分享 stdin 或内联文本 |
+| `drop allow-git <repo> <commit>` | 分享 Git commit diff |
+| `drop list` | 列出活跃和过期分享 |
+| `drop list --json` | 以 JSON 输出分享列表 |
+| `drop revoke <token>` | 撤销分享 token |
+| `drop owner-url` | 打印 owner dashboard URL |
+| `drop status` | 检查 daemon 状态 |
+| `drop stop` | 停止 daemon |
+| `drop serve` | 前台启动服务 |
+| `drop config get <key>` | 读取配置 |
+| `drop config set <key> <value>` | 写入配置 |
 
 ## 配置
 
@@ -180,72 +269,81 @@ drop config set base_url https://files.example.com
 drop config get base_url
 ```
 
-| 配置项 | 默认值 | 说明 |
+| Key | 默认值 | 说明 |
 | --- | --- | --- |
-| `base_url` | `http://localhost:17173` | 生成分享链接时使用的公开 URL 前缀 |
-| `port` | `17173` | 本地服务监听端口 |
-| `file_ttl` | `86400` | 文件分享默认过期时间，单位为秒 |
-| `dir_default_ttl` | `86400` | 目录分享默认过期时间，单位为秒 |
+| `base_url` | `http://localhost:17173` | 生成链接时使用的公共 URL 前缀 |
+| `port` | `17173` | 服务监听端口 |
+| `file_ttl` | `86400` | 文件分享默认 TTL，单位秒 |
+| `dir_default_ttl` | `86400` | 目录分享默认 TTL，单位秒 |
 | `auto_stop` | `false` | 所有分享过期后是否自动停止 daemon |
-| `default_excludes` | 内置排除列表 | 目录分享默认排除项 |
-| `pygments.style` | 未设置 | 代码高亮样式相关配置 |
-| `pygments.linenos` | 未设置 | 是否展示行号 |
 
-运行时状态保存在 `~/.drop/`：
-
-- `drop.db`：分享授权数据库。
-- `config.json`：本地配置。
-- `drop.pid`：daemon PID。
-- `drop.log`：daemon 日志。
-- `shares/`：stdin 或内联内容生成的临时文件。
-
-## 文件渲染能力
+## 渲染能力
 
 | 类型 | 渲染方式 |
 | --- | --- |
-| 代码文件，如 `.py`、`.js`、`.ts`、`.go`、`.rs` | 使用 highlight.js 语法高亮 |
-| Markdown，如 `.md` | 渲染为 HTML，并支持主题和字体控制 |
-| CSV/TSV | 渲染为样式化表格 |
-| PDF | 使用浏览器原生 PDF 预览 |
+| 代码（`.py`、`.js`、`.ts`、`.go`、`.rs` 等） | 使用 highlight.js 语法高亮 |
+| Markdown（`.md`） | 渲染为带文档样式的 HTML |
+| CSV/TSV | 渲染为样式化 HTML 表格 |
+| PDF | 浏览器原生 PDF 查看器 |
 | SVG | 内联渲染 |
 | 音频/视频 | HTML5 播放器 |
-| 图片 | 页面内直接展示 |
-| Git commit | 提交元数据和可展开高亮 diff |
-| 其他文件 | 按原始 content type 返回 |
+| 图片 | 内联显示 |
+| Git commits | 元数据和可展开的高亮 diff |
+| 其他文件 | 按推断 content type 返回原始响应 |
 
-## 安全设计
+## 安全模型
 
-- 限时访问：文件、目录或 commit 必须显式分享后才可访问，并且有 TTL。
-- 随机 token：文件 token 为 8 位十六进制字符，目录 token 为 12 位十六进制字符，owner key 为 32 位十六进制字符。
-- 请求限流：按 IP 限制为每分钟 60 次请求。
-- 路径安全：使用严格的路径前缀检查和 symlink 校验，防止路径穿越。
-- 反爬虫：提供 `robots.txt`、`X-Robots-Tag` 和 `noindex` meta。
-- owner 认证：使用 HMAC 签名 cookie，并采用 timing-safe key 比较。
+- 只有显式分享的内容可以访问。
+- 分享会按 TTL 自动过期。
+- 文件 token 为 8 个 hex 字符，目录 token 为 12 个 hex 字符，owner key 为 32 个 hex 字符。
+- 目录访问包含路径穿越校验和 symlink 校验。
+- 响应包含反爬 header，`robots.txt` 禁止索引。
+- owner 访问使用 HMAC 签名 cookie 和 timing-safe key 比较。
+- 当前限流实现为每个检测到的 IP 每分钟 300 次请求。
+
+重要边界：
+
+- 未过期 token URL 是 bearer link。任何拿到链接的人都能在过期或撤销前访问内容。
+- Markdown 渲染允许原始 HTML，SVG 可以内联渲染。它适合可信本地内容预览，不是给不可信文件使用的安全沙箱。
+- 不要分享密钥、`.env`、API key、OAuth 凭证、数据库备份，或可能包含这些内容的目录。
+
+## 公网访问
+
+只在本机使用时，默认 URL 通常足够：
+
+```bash
+drop README.md
+```
+
+如果要公网分享，运行你偏好的隧道工具并设置 `base_url`：
+
+```bash
+cloudflared tunnel --url http://localhost:17173
+ngrok http 17173
+tailscale funnel 17173
+
+drop config set base_url https://your-domain.example
+```
+
+CLI 暴露了 `drop serve --tunnel` 选项，但在生产工作流中依赖内置隧道前，请先确认当前实现是否完整。
 
 ## 开发
 
 ```bash
 bun install
-bun run dev:serve   # 前台启动服务
-bun run build:web   # 构建 Svelte 前端
-bun run dev:web     # 启动前端 HMR 开发模式
-bun run build       # 构建独立二进制文件
+bun run dev:serve          # 前台启动服务
+bun run build:web          # 构建 Svelte 目录浏览器
+bun run dev:web            # 运行 Svelte 开发服务
+bun run build              # 编译单文件二进制
+bun run verify             # 运行项目验证入口
 ```
 
-构建脚本会先构建 Svelte 前端，将前端资源嵌入生成模块，再通过 `bun build --compile` 输出独立可执行文件。默认构建目标是 `linux-x64`，也可以传入 `--target` 指定目标：
+构建脚本默认生成 `linux-x64` 二进制，也可以传入 `--target` 指定目标：
 
 ```bash
 bun run scripts/build.ts --target darwin-arm64
 ```
 
-## 技术栈
-
-- Bun：运行时、包管理和二进制构建。
-- Hono：本地 Web 服务和路由。
-- Svelte 5 + Vite：目录浏览器前端。
-- highlight.js：代码高亮。
-- markdown-it：Markdown 渲染。
-
-## License
+## 许可证
 
 MIT

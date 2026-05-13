@@ -10,7 +10,9 @@
     "dev:serve": "bun run src/cli/index.ts serve --foreground",
     "build:web": "vite build",
     "build": "bun run scripts/build.ts",
-    "dev:web": "vite dev"
+    "dev:web": "vite dev",
+    "test": "bun run build",
+    "verify": "bun run test"
   },
   "dependencies": {
     "commander": "^12.0.0",
