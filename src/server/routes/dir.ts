@@ -5,7 +5,7 @@
 
 import { Hono } from 'hono';
 import { existsSync, statSync, readFileSync } from 'fs';
-import { join, basename, extname } from 'path';
+import { join, basename } from 'path';
 import { lookupDirAuthorization } from '../../db/dir-authorizations.js';
 import {
   STATUS_NOT_FOUND, STATUS_EXPIRED, MAX_RENDER_SIZE,
@@ -16,6 +16,7 @@ import { jsSafeJson, isSafeSubpath } from '../../shared/utils.js';
 import { handleExpired } from '../middleware/auth.js';
 import { dirBrowserShellHtml } from '../render/html-templates.js';
 import { getRenderer } from '../render/index.js';
+import { guessMime } from '../../shared/mime.js';
 import type { DirAuthorization } from '../../shared/types.js';
 
 const dirRoutes = new Hono();
@@ -212,25 +213,7 @@ dirRoutes.get('/d/:token/raw', (c) => {
   const absPath = validateDirPath(row!.dirpath, relPath, excludes);
   if (!absPath) return c.text('Access denied', 403);
 
-  // Guess content type
-  const ext = extname(absPath).toLowerCase();
-  const mimeMap: Record<string, string> = {
-    '.html': 'text/html', '.htm': 'text/html',
-    '.css': 'text/css', '.js': 'application/javascript',
-    '.json': 'application/json', '.xml': 'application/xml',
-    '.svg': 'image/svg+xml',
-    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif', '.webp': 'image/webp', '.avif': 'image/avif',
-    '.ico': 'image/x-icon', '.bmp': 'image/bmp',
-    '.pdf': 'application/pdf',
-    '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
-    '.flac': 'audio/flac', '.aac': 'audio/aac', '.m4a': 'audio/mp4',
-    '.mp4': 'video/mp4', '.webm': 'video/webm', '.ogv': 'video/ogg',
-    '.mov': 'video/quicktime',
-    '.txt': 'text/plain', '.md': 'text/markdown',
-    '.zip': 'application/zip', '.gz': 'application/gzip',
-  };
-  const contentType = mimeMap[ext] || 'application/octet-stream';
+  const contentType = guessMime(absPath);
 
   const data = readFileSync(absPath);
   return new Response(data, {

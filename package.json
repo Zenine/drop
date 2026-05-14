@@ -12,7 +12,8 @@
     "build": "bun run scripts/build.ts",
     "dev:web": "vite dev",
     "check": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "verify": "scripts/verify.sh"
   },
   "dependencies": {
     "commander": "^12.0.0",

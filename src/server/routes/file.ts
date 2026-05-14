@@ -4,12 +4,12 @@
 
 import { Hono } from 'hono';
 import { existsSync, readFileSync, statSync } from 'fs';
-import { extname } from 'path';
 import { lookupAuthorization } from '../../db/authorizations.js';
 import { STATUS_NOT_FOUND, STATUS_EXPIRED, MAX_RENDER_SIZE } from '../../shared/constants.js';
 import { getFileType } from '../../shared/fs.js';
 import { getRenderer } from '../render/index.js';
 import { handleExpired } from '../middleware/auth.js';
+import { guessMime } from '../../shared/mime.js';
 
 const fileRoutes = new Hono();
 
@@ -33,57 +33,6 @@ function injectLiveJs(html: string, token: string): string {
     '})();' +
     '</script>';
   return html.replace('</body>', script + '</body>');
-}
-
-/**
- * Guess MIME type from extension.
- */
-function guessMime(filepath: string): string {
-  const ext = extname(filepath).toLowerCase();
-  const mimeMap: Record<string, string> = {
-    '.html': 'text/html',
-    '.htm': 'text/html',
-    '.css': 'text/css',
-    '.js': 'application/javascript',
-    '.json': 'application/json',
-    '.xml': 'application/xml',
-    '.svg': 'image/svg+xml',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.webp': 'image/webp',
-    '.avif': 'image/avif',
-    '.ico': 'image/x-icon',
-    '.bmp': 'image/bmp',
-    '.pdf': 'application/pdf',
-    '.mp3': 'audio/mpeg',
-    '.wav': 'audio/wav',
-    '.ogg': 'audio/ogg',
-    '.flac': 'audio/flac',
-    '.aac': 'audio/aac',
-    '.m4a': 'audio/mp4',
-    '.opus': 'audio/opus',
-    '.weba': 'audio/webm',
-    '.mp4': 'video/mp4',
-    '.webm': 'video/webm',
-    '.ogv': 'video/ogg',
-    '.mov': 'video/quicktime',
-    '.avi': 'video/x-msvideo',
-    '.mkv': 'video/x-matroska',
-    '.txt': 'text/plain',
-    '.csv': 'text/csv',
-    '.tsv': 'text/tab-separated-values',
-    '.md': 'text/markdown',
-    '.py': 'text/plain',
-    '.ts': 'text/plain',
-    '.go': 'text/plain',
-    '.rs': 'text/plain',
-    '.zip': 'application/zip',
-    '.gz': 'application/gzip',
-    '.tar': 'application/x-tar',
-  };
-  return mimeMap[ext] || 'application/octet-stream';
 }
 
 function serveFileHandler(c: any) {
