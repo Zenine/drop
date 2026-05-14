@@ -254,7 +254,7 @@ Git commit shares render commit metadata, changed files, and expandable highligh
 | `drop allow-git <repo> <commit>` | share a Git commit diff |
 | `drop list` | list active and expired shares |
 | `drop list --json` | list shares as JSON |
-| `drop revoke <token>` | revoke a share token |
+| `drop revoke <token>` | revoke a file, directory, or Git share token |
 | `drop owner-url` | print the owner dashboard URL |
 | `drop status` | check daemon status |
 | `drop stop` | stop the daemon |
@@ -285,7 +285,7 @@ drop config get base_url
 | Markdown (`.md`) | rendered HTML with readable document styling |
 | CSV/TSV | styled HTML table |
 | PDF | browser-native PDF viewer |
-| SVG | inline rendering |
+| SVG | image preview via data URI |
 | Audio/video | HTML5 player |
 | Images | inline display |
 | Git commits | metadata and expandable highlighted diffs |
@@ -295,16 +295,16 @@ drop config get base_url
 
 - Nothing is accessible until it is explicitly shared.
 - Shares expire automatically according to their TTL.
-- File tokens are 8 hex characters, directory tokens are 12 hex characters, and owner keys are 32 hex characters.
+- File, directory, and Git tokens are at least 32 hex characters (128 bits), and owner keys are 32 hex characters.
 - Directory access uses path traversal checks and symlink validation.
 - Responses include anti-crawler headers and `robots.txt` disallows indexing.
 - Owner access uses HMAC-signed cookies and timing-safe key comparison.
-- Current rate limiting is 300 requests per minute per detected IP.
+- Current rate limiting is 300 requests per minute per client identity. Proxy headers are ignored unless `DROP_TRUST_PROXY=1` is set for a trusted reverse proxy.
 
 Important boundaries:
 
 - Unexpired token URLs are bearer links. Anyone with the URL can access the shared content until it expires or is revoked.
-- Markdown rendering allows raw HTML, and SVG can be rendered inline. Treat previews as suitable for trusted local content, not as a sandbox for untrusted files.
+- Markdown raw HTML is escaped, SVG is rendered through an image preview, and template-controlled file metadata is HTML-escaped. Still treat shared files as bearer-link content and avoid sharing untrusted or sensitive material.
 - Avoid sharing secrets, `.env` files, API keys, OAuth credentials, database backups, or directories that may contain them.
 
 ## Public Access

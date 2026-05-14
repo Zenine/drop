@@ -15,7 +15,7 @@ function getMd(): MarkdownIt {
   if (md) return md;
 
   md = new MarkdownIt({
-    html: true,
+    html: false,
     linkify: true,
     typographer: false,
     highlight(str: string, lang: string): string {

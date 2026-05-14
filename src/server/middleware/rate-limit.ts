@@ -7,20 +7,25 @@ const RATE_CLEANUP_INTERVAL = 300; // seconds
 const rateLimits = new Map<string, number[]>();
 let lastCleanup = Date.now() / 1000;
 
-function getClientIp(c: Context): string {
+export function getClientIpFromHeaders(headers: Headers, trustProxy = false): string {
+  if (!trustProxy) return '127.0.0.1';
+
   // CF-Connecting-IP (Cloudflare) takes priority
-  const cfIp = c.req.header('cf-connecting-ip');
+  const cfIp = headers.get('cf-connecting-ip');
   if (cfIp) return cfIp.trim();
 
-  // X-Forwarded-For: last entry is from closest trusted proxy
-  const xff = c.req.header('x-forwarded-for');
+  // X-Forwarded-For: first entry is the original client when the proxy is trusted.
+  const xff = headers.get('x-forwarded-for');
   if (xff) {
     const parts = xff.split(',');
-    return parts[parts.length - 1].trim();
+    return parts[0].trim();
   }
 
-  // Fallback to connection info
-  return c.req.header('x-real-ip') || '127.0.0.1';
+  return headers.get('x-real-ip') || '127.0.0.1';
+}
+
+function getClientIp(c: Context): string {
+  return getClientIpFromHeaders(c.req.raw.headers, process.env.DROP_TRUST_PROXY === '1');
 }
 
 export async function rateLimitMiddleware(c: Context, next: Next): Promise<Response | void> {

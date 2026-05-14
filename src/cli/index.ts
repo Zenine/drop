@@ -344,7 +344,7 @@ program
 // revoke
 program
   .command('revoke')
-  .description('Revoke access to a file by its token')
+  .description('Revoke access to a file, directory, or git share by its token')
   .argument('<token>', 'Token to revoke')
   .action((token) => {
     if (removeAuthorization(token)) {
