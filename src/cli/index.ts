@@ -21,6 +21,62 @@ import { buildUrl } from './url.js';
 import { outputShareError, outputShareResult } from './output.js';
 import { VALID_CONFIG_KEYS, applyConfigValue, getConfigValue, isValidConfigKey } from './config.js';
 import { isDaemonRunning, readPid, removePid, startCleanupTimer, startDaemon, stopDaemon, writePid } from './daemon.js';
+import { scanGitCommit, scanPath, scanText, type SecretScanResult } from '../shared/secret-scan.js';
+
+interface SecretScanCliOptions {
+  force?: boolean;
+  secretScan?: boolean;
+  json?: boolean;
+}
+
+type SecretScanSuccessMetadata =
+  | { disabled: true }
+  | { forced: true; findings_count: number; findings: SecretScanResult['findings'] }
+  | undefined;
+
+function writeCliError(opts: { json?: boolean }, message: string, secretScan?: Record<string, unknown>): never {
+  if (opts.json) {
+    const payload: Record<string, unknown> = { error: message };
+    if (secretScan) payload.secret_scan = secretScan;
+    console.log(JSON.stringify(payload));
+  } else {
+    console.error(message);
+    if (secretScan?.findings) {
+      console.error(JSON.stringify(secretScan, null, 2));
+    }
+  }
+  process.exit(1);
+}
+
+function runSecretScanForCli(opts: SecretScanCliOptions, scan: () => SecretScanResult): SecretScanSuccessMetadata {
+  if (opts.force && opts.secretScan === false) {
+    writeCliError(opts, '--force and --no-secret-scan cannot be used together');
+  }
+
+  if (opts.secretScan === false) {
+    return { disabled: true };
+  }
+
+  const result = scan();
+  if (result.blocked && !opts.force) {
+    writeCliError(opts, 'Secret scan blocked sharing because high-confidence secrets were found.', {
+      blocked: true,
+      findings_count: result.findings.length,
+      findings: result.findings,
+    });
+  }
+
+  if (opts.force) {
+    return { forced: true, findings_count: result.findings.length, findings: result.findings };
+  }
+
+  return undefined;
+}
+
+function withSecretScanMetadata<T extends Record<string, unknown>>(payload: T, metadata: SecretScanSuccessMetadata): T & { secret_scan?: SecretScanSuccessMetadata } {
+  if (!metadata) return payload;
+  return { ...payload, secret_scan: metadata };
+}
 
 // --- CLI setup ---
 
@@ -76,6 +132,8 @@ program
   .option('--tail <lines>', 'Only show last N lines (files only)')
   .option('--exclude <pattern...>', 'Additional exclude patterns for directory shares')
   .option('--live', 'Enable live preview (auto-refresh on file changes)', false)
+  .option('--force', 'Continue even when secret scan finds high-confidence secrets', false)
+  .option('--no-secret-scan', 'Skip secret scanning before creating authorization')
   .option('--json', 'Output result as JSON', false)
   .option('--qr', 'Print a terminal QR code to stderr', false)
   .action(async (path, opts) => {
@@ -88,18 +146,29 @@ program
     const isDir = existsSync(absPath) && statSync(absPath).isDirectory();
     const isFile = existsSync(absPath) && statSync(absPath).isFile();
 
+    if (!isDir && !isFile) {
+      if (opts.json) {
+        console.log(JSON.stringify({ error: `Path not found: ${absPath}` }));
+      } else {
+        console.error(`Path not found: ${absPath}`);
+      }
+      process.exit(1);
+    }
+
+    const excludes = isDir ? [...(cfg.default_excludes || DEFAULT_EXCLUDES), ...(opts.exclude || [])] : [];
+    const secretScan = runSecretScanForCli(opts, () => scanPath(absPath, { excludes }));
+
     if (isDir) {
       const ttl = opts.ttl ? parseInt(opts.ttl, 10) : (cfg.dir_default_ttl || DIR_DEFAULT_TTL);
       if (opts.head || opts.tail) {
         console.error('Warning: --head and --tail are ignored for directory shares');
       }
-      const excludes = [...(cfg.default_excludes || DEFAULT_EXCLUDES), ...(opts.exclude || [])];
       const { token, dirname, isNew } = addDirAuthorization(absPath, ttl, excludes, opts.live);
       const url = buildUrl(cfg, 'd', token, port, host);
       const expiresAt = Date.now() / 1000 + ttl;
 
       outputShareResult(
-        { url, token, type: 'dir', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew },
+        withSecretScanMetadata({ url, token, type: 'dir', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew }, secretScan),
         {
           json: opts.json,
           qr: opts.qr,
@@ -123,7 +192,7 @@ program
       if (params.length) url += '?' + params.join('&');
 
       outputShareResult(
-        { url, token, type: 'file', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew },
+        withSecretScanMetadata({ url, token, type: 'file', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew }, secretScan),
         {
           json: opts.json,
           qr: opts.qr,
@@ -135,9 +204,6 @@ program
       );
 
       if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
-    } else {
-      outputShareError(`Path not found: ${absPath}`, { json: opts.json, qr: opts.qr });
-      process.exit(1);
     }
   });
 
@@ -151,6 +217,8 @@ program
   .option('--ttl <seconds>', 'Time-to-live in seconds')
   .option('--port <port>', 'Port for URL generation', String(DEFAULT_PORT))
   .option('--host <host>', 'Host for URL generation', 'localhost')
+  .option('--force', 'Continue even when secret scan finds high-confidence secrets', false)
+  .option('--no-secret-scan', 'Skip secret scanning before creating authorization')
   .option('--json', 'Output result as JSON', false)
   .option('--qr', 'Print a terminal QR code to stderr', false)
   .action(async (opts) => {
@@ -172,6 +240,8 @@ program
       process.exit(1);
     }
 
+    const secretScan = runSecretScanForCli(opts, () => scanText(text, opts.title || '<stdin>'));
+
     mkdirSync(SHARES_DIR, { recursive: true });
     const ext = SHARE_TYPE_MAP[opts.type] || '.txt';
     const slug = opts.title ? opts.title.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 40) : 'share';
@@ -186,7 +256,7 @@ program
     const url = buildUrl(cfg, 'f', token, port, opts.host);
 
     outputShareResult(
-      { url, token, type: opts.type, path: filepath, ttl, expires_at: Date.now() / 1000 + ttl },
+      withSecretScanMetadata({ url, token, type: opts.type, path: filepath, ttl, expires_at: Date.now() / 1000 + ttl }, secretScan),
       { json: opts.json, qr: opts.qr },
     );
 
@@ -201,6 +271,8 @@ program
   .argument('<commit_hash>', 'Commit hash to share')
   .option('--ttl <seconds>', 'Time-to-live in seconds')
   .option('--port <port>', 'Port for URL generation', String(DEFAULT_PORT))
+  .option('--force', 'Continue even when secret scan finds high-confidence secrets', false)
+  .option('--no-secret-scan', 'Skip secret scanning before creating authorization')
   .option('--json', 'Output result as JSON', false)
   .option('--qr', 'Print a terminal QR code to stderr', false)
   .action(async (repoPath, commitHash, opts) => {
@@ -210,15 +282,16 @@ program
     const ttl = opts.ttl ? parseInt(opts.ttl, 10) : (cfg.file_ttl || DEFAULT_TTL);
 
     try {
+      const secretScan = runSecretScanForCli(opts, () => scanGitCommit(repoPath, commitHash));
       const { token, isNew } = addGitAuthorization(repoPath, commitHash, ttl);
       const url = buildUrl(cfg, 'git', token, port);
 
       outputShareResult(
-        {
+        withSecretScanMetadata({
           url, token, type: 'git',
           repo_path: resolve(repoPath), commit_hash: commitHash,
           ttl, expires_at: Date.now() / 1000 + ttl,
-        },
+        }, secretScan),
         {
           json: opts.json,
           qr: opts.qr,
