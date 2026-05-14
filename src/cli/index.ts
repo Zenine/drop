@@ -17,6 +17,7 @@ import { displayPath } from '../shared/utils.js';
 import { addAuthorization, removeAuthorization, listAuthorizations } from '../db/authorizations.js';
 import { addDirAuthorization, listDirAuthorizations } from '../db/dir-authorizations.js';
 import { addGitAuthorization } from '../db/git-authorizations.js';
+import { assertShareSlugAvailable, createShareAlias, lookupShareAliasByToken } from '../db/share-aliases.js';
 import { getDb } from '../db/index.js';
 import { buildUrl } from './url.js';
 import { outputShareError, outputShareResult } from './output.js';
@@ -79,6 +80,27 @@ function withSecretScanMetadata<T extends Record<string, unknown>>(payload: T, m
   return { ...payload, secret_scan: metadata };
 }
 
+
+function applySlug(
+  cfg: Record<string, unknown>,
+  type: 'file' | 'dir' | 'git',
+  prefix: string,
+  token: string,
+  slug: string | undefined,
+  port: number,
+  host = 'localhost',
+): { publicId: string; url: string; slug?: string } {
+  if (!slug) return { publicId: token, url: buildUrl(cfg, prefix, token, port, host) };
+  const alias = createShareAlias(slug, type, token);
+  return { publicId: alias.slug, slug: alias.slug, url: buildUrl(cfg, prefix, alias.slug, port, host) };
+}
+
+function warnGuessableBearerUrl(opts: { json?: boolean; slug?: string }): void {
+  if (opts.slug && !opts.json) {
+    console.error('Warning: custom slug creates a guessable bearer URL; anyone with the URL can access this share.');
+  }
+}
+
 // --- CLI setup ---
 
 const program = new Command();
@@ -136,6 +158,7 @@ program
   .option('--live', 'Enable live preview (auto-refresh on file changes)', false)
   .option('--force', 'Continue even when secret scan finds high-confidence secrets', false)
   .option('--no-secret-scan', 'Skip secret scanning before creating authorization')
+  .option('--slug <slug>', 'Custom public slug for the share')
   .option('--json', 'Output result as JSON', false)
   .option('--qr', 'Print a terminal QR code to stderr', false)
   .action(async (path, opts) => {
@@ -144,6 +167,7 @@ program
     const cfg = loadConfig();
     const port = cfg.port || parseInt(opts.port, 10);
     const host = opts.host;
+    if (opts.slug) assertShareSlugAvailable(opts.slug);
 
     const isDir = existsSync(absPath) && statSync(absPath).isDirectory();
     const isFile = existsSync(absPath) && statSync(absPath).isFile();
@@ -172,15 +196,17 @@ program
         console.error('Warning: --head and --tail are ignored for directory shares');
       }
       const { token, dirname, isNew } = addDirAuthorization(absPath, ttl, excludes, opts.live);
-      const url = buildUrl(cfg, 'd', token, port, host);
+      const aliasUrl = applySlug(cfg, 'dir', 'd', token, opts.slug, port, host);
+      const url = aliasUrl.url;
       const expiresAt = Date.now() / 1000 + ttl;
 
       outputShareResult(
-        withSecretScanMetadata({ url, token, type: 'dir', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew }, secretScan),
+        withSecretScanMetadata({ url, token, slug: aliasUrl.slug, type: 'dir', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew }, secretScan),
         {
           json: opts.json,
           qr: opts.qr,
           stderrMessages: [
+            ...(opts.slug ? ['Warning: custom slug creates a guessable bearer URL; anyone with the URL can access this share.'] : []),
             ...(!isNew ? ['(existing authorization extended)'] : []),
             ...(opts.live ? ['(live preview enabled)'] : []),
           ],
@@ -191,7 +217,8 @@ program
     } else if (isFile) {
       const ttl = opts.ttl ? parseInt(opts.ttl, 10) : (cfg.file_ttl || DEFAULT_TTL);
       const { token, filename, isNew } = addAuthorization(path, ttl, opts.live);
-      let url = buildUrl(cfg, 'f', token, port, host);
+      const aliasUrl = applySlug(cfg, 'file', 'f', token, opts.slug, port, host);
+      let url = aliasUrl.url;
       const expiresAt = Date.now() / 1000 + ttl;
 
       const params: string[] = [];
@@ -200,11 +227,12 @@ program
       if (params.length) url += '?' + params.join('&');
 
       outputShareResult(
-        withSecretScanMetadata({ url, token, type: 'file', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew }, secretScan),
+        withSecretScanMetadata({ url, token, slug: aliasUrl.slug, type: 'file', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew }, secretScan),
         {
           json: opts.json,
           qr: opts.qr,
           stderrMessages: [
+            ...(opts.slug ? ['Warning: custom slug creates a guessable bearer URL; anyone with the URL can access this share.'] : []),
             ...(!isNew ? ['(existing authorization extended)'] : []),
             ...(opts.live ? ['(live preview enabled)'] : []),
           ],
@@ -222,6 +250,7 @@ program
   .option('--type <type>', 'Content type for rendering', 'text')
   .option('--content <text>', 'Inline content string to share')
   .option('--title <title>', 'Title for the shared content')
+  .option('--slug <slug>', 'Custom public slug for the share')
   .option('--ttl <seconds>', 'Time-to-live in seconds')
   .option('--port <port>', 'Port for URL generation', String(DEFAULT_PORT))
   .option('--host <host>', 'Host for URL generation', 'localhost')
@@ -231,6 +260,7 @@ program
   .option('--qr', 'Print a terminal QR code to stderr', false)
   .action(async (opts) => {
     ensureStateDir();
+    if (opts.slug) assertShareSlugAvailable(opts.slug);
 
     let text: string;
     if (opts.content != null) {
@@ -261,11 +291,16 @@ program
     const port = cfg.port || parseInt(opts.port, 10);
     const ttl = opts.ttl ? parseInt(opts.ttl, 10) : (cfg.file_ttl || DEFAULT_TTL);
     const { token, isNew } = addAuthorization(filepath, ttl);
-    const url = buildUrl(cfg, 'f', token, port, opts.host);
+    const aliasUrl = applySlug(cfg, 'file', 'f', token, opts.slug, port, opts.host);
+    const url = aliasUrl.url;
 
     outputShareResult(
-      withSecretScanMetadata({ url, token, type: opts.type, path: filepath, ttl, expires_at: Date.now() / 1000 + ttl }, secretScan),
-      { json: opts.json, qr: opts.qr },
+      withSecretScanMetadata({ url, token, slug: aliasUrl.slug, type: opts.type, path: filepath, ttl, expires_at: Date.now() / 1000 + ttl }, secretScan),
+      {
+        json: opts.json,
+        qr: opts.qr,
+        stderrMessages: opts.slug ? ['Warning: custom slug creates a guessable bearer URL; anyone with the URL can access this share.'] : [],
+      },
     );
 
     if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
@@ -281,6 +316,7 @@ program
   .option('--port <port>', 'Port for URL generation', String(DEFAULT_PORT))
   .option('--force', 'Continue even when secret scan finds high-confidence secrets', false)
   .option('--no-secret-scan', 'Skip secret scanning before creating authorization')
+  .option('--slug <slug>', 'Custom public slug for the share')
   .option('--json', 'Output result as JSON', false)
   .option('--qr', 'Print a terminal QR code to stderr', false)
   .action(async (repoPath, commitHash, opts) => {
@@ -288,22 +324,27 @@ program
     const cfg = loadConfig();
     const port = cfg.port || parseInt(opts.port, 10);
     const ttl = opts.ttl ? parseInt(opts.ttl, 10) : (cfg.file_ttl || DEFAULT_TTL);
+    if (opts.slug) assertShareSlugAvailable(opts.slug);
 
     try {
       const secretScan = runSecretScanForCli(opts, () => scanGitCommit(repoPath, commitHash));
       const { token, isNew } = addGitAuthorization(repoPath, commitHash, ttl);
-      const url = buildUrl(cfg, 'git', token, port);
+      const aliasUrl = applySlug(cfg, 'git', 'git', token, opts.slug, port);
+      const url = aliasUrl.url;
 
       outputShareResult(
         withSecretScanMetadata({
-          url, token, type: 'git',
+          url, token, slug: aliasUrl.slug, type: 'git',
           repo_path: resolve(repoPath), commit_hash: commitHash,
           ttl, expires_at: Date.now() / 1000 + ttl,
         }, secretScan),
         {
           json: opts.json,
           qr: opts.qr,
-          stderrMessages: !isNew ? ['(existing authorization extended)'] : [],
+          stderrMessages: [
+            ...(opts.slug ? ['Warning: custom slug creates a guessable bearer URL; anyone with the URL can access this share.'] : []),
+            ...(!isNew ? ['(existing authorization extended)'] : []),
+          ],
         },
       );
 
@@ -326,12 +367,14 @@ program
 
     for (const row of listAuthorizations()) {
       const remaining = row.expires_at - now;
+      const alias = lookupShareAliasByToken(row.token);
+      const publicId = alias?.slug || row.token;
       allShares.push({
-        token: row.token, type: 'file', path: row.filepath,
+        token: row.token, slug: alias?.slug, type: 'file', path: row.filepath,
         status: remaining > 0 ? STATUS_ACTIVE : STATUS_EXPIRED,
         remaining: Math.max(0, Math.floor(remaining)),
         expires_at: row.expires_at,
-        url: buildUrl(cfg, 'f', row.token, DEFAULT_PORT),
+        url: buildUrl(cfg, 'f', publicId, DEFAULT_PORT),
       });
     }
 
@@ -341,23 +384,27 @@ program
     ).all() as any[];
     for (const row of gitRows) {
       const remaining = row.expires_at - now;
+      const alias = lookupShareAliasByToken(row.token);
+      const publicId = alias?.slug || row.token;
       allShares.push({
-        token: row.token, type: 'git', path: row.repo_path, name: row.commit_hash.slice(0, 12),
+        token: row.token, slug: alias?.slug, type: 'git', path: row.repo_path, name: row.commit_hash.slice(0, 12),
         status: remaining > 0 ? STATUS_ACTIVE : STATUS_EXPIRED,
         remaining: Math.max(0, Math.floor(remaining)),
         expires_at: row.expires_at,
-        url: buildUrl(cfg, 'git', row.token, DEFAULT_PORT),
+        url: buildUrl(cfg, 'git', publicId, DEFAULT_PORT),
       });
     }
 
     for (const row of listDirAuthorizations()) {
       const remaining = row.expires_at - now;
+      const alias = lookupShareAliasByToken(row.token);
+      const publicId = alias?.slug || row.token;
       allShares.push({
-        token: row.token, type: 'dir', path: row.dirpath,
+        token: row.token, slug: alias?.slug, type: 'dir', path: row.dirpath,
         status: remaining > 0 ? STATUS_ACTIVE : STATUS_EXPIRED,
         remaining: Math.max(0, Math.floor(remaining)),
         expires_at: row.expires_at,
-        url: buildUrl(cfg, 'd', row.token, DEFAULT_PORT),
+        url: buildUrl(cfg, 'd', publicId, DEFAULT_PORT),
       });
     }
 
@@ -379,21 +426,21 @@ program
       console.log('Files:');
       for (const s of files) {
         const status = s.status === STATUS_ACTIVE ? `${s.remaining}s remaining` : STATUS_EXPIRED;
-        console.log(`  ${s.token}  ${s.path}  [${status}]`);
+        console.log(`  ${s.slug || s.token}  ${s.path}  [${status}]`);
       }
     }
     if (gits.length) {
       console.log('Git commits:');
       for (const s of gits) {
         const status = s.status === STATUS_ACTIVE ? `${s.remaining}s remaining` : STATUS_EXPIRED;
-        console.log(`  ${s.token}  ${displayPath(s.path)} ${s.name}  [${status}]`);
+        console.log(`  ${s.slug || s.token}  ${displayPath(s.path)} ${s.name}  [${status}]`);
       }
     }
     if (dirs.length) {
       console.log('Directories:');
       for (const s of dirs) {
         const status = s.status === STATUS_ACTIVE ? `${s.remaining}s remaining` : STATUS_EXPIRED;
-        console.log(`  ${s.token}  ${displayPath(s.path)}  [${status}]`);
+        console.log(`  ${s.slug || s.token}  ${displayPath(s.path)}  [${status}]`);
       }
     }
   });

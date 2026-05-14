@@ -4,6 +4,7 @@
 
 import { Hono } from 'hono';
 import { lookupGitAuthorization, getGitCommitInfo } from '../../db/git-authorizations.js';
+import { resolveShareToken } from '../../db/share-aliases.js';
 import { STATUS_NOT_FOUND, STATUS_EXPIRED } from '../../shared/constants.js';
 import { displayPath, htmlEscape } from '../../shared/utils.js';
 import { handleExpired } from '../middleware/auth.js';
@@ -13,7 +14,8 @@ import { highlightCode, getHighlightCss } from '../render/code.js';
 const gitRoutes = new Hono();
 
 gitRoutes.get('/git/:token', (c) => {
-  const token = c.req.param('token');
+  const publicId = c.req.param('token');
+  const token = resolveShareToken('git', publicId);
   const { row, status } = lookupGitAuthorization(token);
 
   if (status === STATUS_NOT_FOUND) {

@@ -191,6 +191,20 @@ drop allow ~/file.py
 
 这两个命令都会分享同一个文件。如果 daemon 尚未运行，它会自动启动。
 
+### 自定义 slug
+
+如果希望生成可读的公开 URL，可以使用 `--slug`，而不是只使用随机 token URL：
+
+```bash
+drop allow ~/report.pdf --slug q2-report
+drop share --content "hello" --slug hello-note
+drop allow-git . HEAD --slug release-review
+```
+
+Slug 链接和 token 链接使用同一个 bearer-link 安全模型：`/f/:slug`、`/d/:slug`、`/git/:slug` 在过期或撤销前，任何知道 URL 的人都可以访问。原 token URL 仍然有效。Slug 全局唯一，会统一转为小写，长度 3-64，只允许字母、数字、`_` 和 `-`，且首尾必须是字母或数字。`api`、`raw`、`dashboard`、`f`、`d`、`git`、`list`、`revoke` 等路由名是保留词。非 JSON 输出会提示警告，因为自定义 slug 更容易被猜到。
+
+`drop list --json` 会在存在 slug 时包含 `slug` 和公开 `url`；`drop revoke <id>` 支持传 token 或 slug。
+
 ### 如何选择命令
 
 | 内容 | 推荐命令 |
@@ -215,6 +229,7 @@ drop ~/file.py --live              # 文件变化时刷新预览
 drop ~/file.py --qr                # 同时把终端二维码输出到 stderr
 drop ~/file.py --force             # 扫描密钥；即使命中也继续分享
 drop ~/file.py --no-secret-scan    # 跳过分享前密钥扫描
+drop ~/file.py --slug demo-file    # 生成可读的 /f/demo-file URL
 ```
 
 ### 目录
@@ -228,6 +243,7 @@ drop ~/project/ --live             # 目录变化时刷新
 drop ~/project/ --qr               # 同时把终端二维码输出到 stderr
 drop ~/project/ --force            # 扫描密钥；即使命中也继续分享
 drop ~/project/ --no-secret-scan   # 跳过分享前密钥扫描
+drop ~/project/ --slug demo-dir    # 生成可读的 /d/demo-dir URL
 ```
 
 默认排除项：所有 dotfile 和隐藏目录，例如 `.env`、`.github/`、`.idea/`、`.nebula-secrets/`，以及 `__pycache__/`、`node_modules/`、`*.pyc`、`.venv/`。只有明确需要分享隐藏文件时才使用 `--include-hidden`；已配置的 `default_excludes` 和显式 `--exclude` 仍然生效。
@@ -241,6 +257,7 @@ drop share --content "print('hi')" --type python
 echo "# Hello" | drop share --type markdown --qr
 drop share --content "..." --force --json
 drop share --content "..." --no-secret-scan --json
+drop share --content "hello" --slug hello-note
 ```
 
 支持的类型：`markdown`、`python`、`javascript`、`json`、`yaml`、`html`、`css`、`shell`、`diff`、`code`、`text`。
@@ -302,7 +319,7 @@ drop allow ~/file.py --json --qr | jq .
 | 分享类命令上的 `--no-secret-scan` | 跳过分享前密钥扫描 |
 | `drop list` | 列出活跃和过期分享 |
 | `drop list --json` | 以 JSON 输出分享列表 |
-| `drop revoke <token>` | 撤销文件、目录或 Git 分享 token |
+| `drop revoke <token-or-slug>` | 撤销文件、目录或 Git 分享 token/slug |
 | `drop owner-url` | 打印 owner dashboard URL |
 | `drop status` | 检查 daemon 状态 |
 | `drop stop` | 停止 daemon |
@@ -352,7 +369,7 @@ drop config get base_url
 
 重要边界：
 
-- 未过期 token URL 是 bearer link。任何拿到链接的人都能在过期或撤销前访问内容。
+- 未过期 token URL 和 slug URL 都是 bearer link。任何拿到链接的人都能在过期或撤销前访问内容。自定义 slug 可读且更容易被猜到，不要用于敏感内容。
 - Markdown 原始 HTML 会被转义，SVG 通过图片预览渲染，模板控制的文件元数据会进行 HTML 转义。仍应把分享内容视为 bearer-link 内容，避免分享不可信或敏感材料。
 - 不要分享密钥、`.env`、API key、OAuth 凭证、数据库备份，或可能包含这些内容的目录。
 
