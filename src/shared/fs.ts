@@ -58,6 +58,7 @@ export function walkDirectory(dirpath: string, excludes: string[]): DirEntry {
 
 function walkDirectoryUncached(dirpath: string, excludes: string[]): DirEntry {
   const baseReal = realpathSync(dirpath);
+  const visitedDirs = new Set<string>([baseReal]);
   let fileCount = 0;
 
   function walk(currentPath: string, relPrefix: string): DirEntry[] {
@@ -83,8 +84,8 @@ function walkDirectoryUncached(dirpath: string, excludes: string[]): DirEntry {
         const entryPath = join(currentPath, entry.name);
 
         // For symlinks, check they don't escape the base directory
+        let realTarget: string | null = null;
         if (isLink) {
-          let realTarget: string;
           try {
             realTarget = realpathSync(entryPath);
           } catch {
@@ -101,6 +102,9 @@ function walkDirectoryUncached(dirpath: string, excludes: string[]): DirEntry {
         const relPath = relPrefix ? join(relPrefix, entry.name) : entry.name;
 
         if (isDir) {
+          const realDir = realTarget || realpathSync(entryPath);
+          if (visitedDirs.has(realDir)) continue;
+          visitedDirs.add(realDir);
           const subChildren = walk(entryPath, relPath);
           children.push({
             name: entry.name,
