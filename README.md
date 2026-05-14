@@ -27,6 +27,7 @@ Share local files, folders, stdin content, and Git diffs through time-limited pr
 | Share current Git diff | <code>git diff &#124; drop share --type diff</code> |
 | Share a commit | `drop allow-git . HEAD` |
 | List active shares | `drop list` |
+| View access stats | `drop stats --json` |
 | Stop the daemon | `drop stop` |
 
 ## Contents
@@ -144,6 +145,7 @@ share_directory: drop /path/to/dir
 share_stdin: command | drop share --type text
 share_diff: git diff | drop share --type diff
 list_shares: drop list
+stats: drop stats --json
 stop_daemon: drop stop
 never_share:
   - .env
@@ -320,13 +322,30 @@ If QR rendering fails, the share still succeeds and Drop prints a warning to std
 | `--no-secret-scan` on share commands | skip the pre-share secret scan |
 | `drop list` | list active and expired shares |
 | `drop list --json` | list shares as JSON |
-| `drop revoke <token-or-slug>` | revoke a file, directory, or Git share token/slug |
+| `drop stats [token] --json --since <24h\|7d\|30d>` | show access view, unique visitor, and last access stats |
+| `drop stats [token] --include-live` | include live polling events in view counts |
+| `drop revoke <token-or-slug>` | revoke a file, directory, or Git share token/slug and delete its access events |
 | `drop owner-url` | print the owner dashboard URL |
 | `drop status` | check daemon status |
 | `drop stop` | stop the daemon |
 | `drop serve` | start the server in the foreground |
 | `drop config get <key>` | read a config value |
 | `drop config set <key> <value>` | write a config value |
+
+
+## Access Stats
+
+`drop` records privacy-preserving access events for successful share views. Default view counts include rendered page views (`/f/:token`, `/d/:token`, `/d/:token/*`, `/git/:token`) and raw directory file views (`/d/:token/raw`). Directory tree/file preview API calls may be recorded as `api_tree` and `api_preview`, but they are not counted as views by default. Live polling is not included unless `--include-live` is used.
+
+```bash
+drop stats --json
+drop stats <token-or-slug> --json --since 7d
+drop stats <token-or-slug> --include-live
+```
+
+The owner-only dashboard and `/api/stats` / `/api/stats/:token-or-slug` endpoints expose the same view, unique visitor, and last access totals.
+
+Privacy notes: access events never store raw IP addresses, full user agents, full referrers, full directory paths, query strings, cookies, or owner keys. Client identity and directory target paths are stored as HMAC hashes, referrers are reduced to origin, user agents are coarse browser/tool categories, and target paths keep only a hash plus file extension. Revoking a token deletes its access events.
 
 ## Configuration
 
@@ -366,6 +385,7 @@ drop config get base_url
 - Pre-share secret scanning is enabled by default for file, directory, stdin/content, and Git commit shares. Blocking findings are reported only with sanitized metadata and fingerprints.
 - Responses include anti-crawler headers and `robots.txt` disallows indexing.
 - Owner access uses HMAC-signed cookies and timing-safe key comparison.
+- Access logging is privacy-preserving: raw IPs, full user agents, full referrers, full target paths, query strings, cookies, and owner keys are not stored.
 - Current rate limiting is 300 requests per minute per client identity. Proxy headers are ignored unless `DROP_TRUST_PROXY=1` is set for a trusted reverse proxy.
 
 Important boundaries:

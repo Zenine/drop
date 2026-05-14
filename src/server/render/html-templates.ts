@@ -740,6 +740,9 @@ export interface DashboardPageOpts {
     url: string;
     created_str: string;
     expires_str: string;
+    views: number;
+    unique: number;
+    last_access_str: string;
     status: string;
   }>;
   shareCount: number;
@@ -761,13 +764,16 @@ export function dashboardPageHtml(opts: DashboardPageOpts): string {
         <td><a class="token-link" href="${attr(s.url)}">${h(s.slug || (s.token.slice(0, 8) + '…'))}</a></td>
         <td>${h(s.created_str)}</td>
         <td>${h(s.expires_str)}</td>
+        <td>${h(s.views ?? 0)}</td>
+        <td>${h(s.unique ?? 0)}</td>
+        <td>${h(s.last_access_str ?? '—')}</td>
         <td class="status-${attr(s.status)}">${h(s.status)}</td>
       </tr>`;
     }
     tableBody = `
   <table class="shares-table">
     <thead>
-      <tr><th>Type</th><th>Path</th><th>Public ID</th><th>Created</th><th>Expires</th><th>Status</th></tr>
+      <tr><th>Type</th><th>Path</th><th>Public ID</th><th>Created</th><th>Expires</th><th>Views</th><th>Unique</th><th>Last access</th><th>Status</th></tr>
     </thead>
     <tbody>${rows}</tbody>
   </table>`;

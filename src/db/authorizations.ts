@@ -3,6 +3,7 @@ import { resolve } from 'path';
 import { existsSync } from 'fs';
 import { getDb } from './index.js';
 import { deleteShareAliasesForToken, lookupShareAlias } from './share-aliases.js';
+import { deleteAccessEventsForToken } from './access-events.js';
 import {
   TOKEN_LENGTH,
   STATUS_VALID, STATUS_EXPIRED, STATUS_NOT_FOUND,
@@ -49,7 +50,10 @@ export function removeAuthorization(tokenOrSlug: string): boolean {
   const dirResult = db.query('DELETE FROM dir_authorizations WHERE token = ?').run(token);
   const gitResult = db.query('DELETE FROM git_authorizations WHERE token = ?').run(token);
   const changed = (fileResult.changes + dirResult.changes + gitResult.changes) > 0;
-  if (changed) deleteShareAliasesForToken(token);
+  if (changed) {
+    deleteShareAliasesForToken(token);
+    deleteAccessEventsForToken(token);
+  }
   return changed;
 }
 

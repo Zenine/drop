@@ -10,6 +10,7 @@ import { displayPath, htmlEscape } from '../../shared/utils.js';
 import { handleExpired } from '../middleware/auth.js';
 import { gitPageHtml } from '../render/html-templates.js';
 import { highlightCode, getHighlightCss } from '../render/code.js';
+import { recordRouteAccess } from '../access-logging.js';
 
 const gitRoutes = new Hono();
 
@@ -63,6 +64,7 @@ gitRoutes.get('/git/:token', (c) => {
     ? `<p class="commit-body">${htmlEscape(info.body)}</p>`
     : '';
 
+  recordRouteAccess(c, token, 'git', 'page_view');
   return c.html(gitPageHtml({
     repoPath: repoDisplay,
     shortHash,

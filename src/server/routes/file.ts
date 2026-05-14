@@ -11,6 +11,7 @@ import { getFileType } from '../../shared/fs.js';
 import { getRenderer } from '../render/index.js';
 import { handleExpired } from '../middleware/auth.js';
 import { guessMime } from '../../shared/mime.js';
+import { recordRouteAccess } from '../access-logging.js';
 
 const fileRoutes = new Hono();
 
@@ -70,12 +71,14 @@ function serveFileHandler(c: any) {
     if (row!.live && html.includes('</body>')) {
       html = injectLiveJs(html, publicId);
     }
+    recordRouteAccess(c, token, 'file', 'page_view');
     return c.html(html);
   }
 
   // Serve raw file (images, PDFs, binary)
   const mime = guessMime(filepath);
   const data = readFileSync(filepath);
+  recordRouteAccess(c, token, 'file', 'page_view');
   return new Response(data, {
     headers: { 'Content-Type': mime },
   });

@@ -18,6 +18,7 @@ import { handleExpired } from '../middleware/auth.js';
 import { dirBrowserShellHtml } from '../render/html-templates.js';
 import { getRenderer } from '../render/index.js';
 import { guessMime } from '../../shared/mime.js';
+import { recordRouteAccess } from '../access-logging.js';
 import type { DirAuthorization } from '../../shared/types.js';
 
 const dirRoutes = new Hono();
@@ -132,8 +133,10 @@ dirRoutes.get('/d/:token', (c) => {
   const result = renderDirBrowser(row!, '', c.req.param('token'));
   if (typeof result === 'string') {
     if (result === 'Directory no longer exists on disk') return c.text(result, 404);
+    recordRouteAccess(c, row!.token, 'dir', 'page_view');
     return c.html(result);
   }
+  recordRouteAccess(c, row!.token, 'dir', 'page_view');
   return result;
 });
 
@@ -146,6 +149,7 @@ dirRoutes.get('/d/:token/api/tree', (c) => {
   const excludes = getExcludes(row!);
   const tree = walkDirectory(row!.dirpath, excludes);
 
+  recordRouteAccess(c, row!.token, 'dir', 'api_tree');
   return c.json({ tree, dirname: row!.dirname, token: c.req.param('token') });
 });
 
@@ -179,10 +183,12 @@ dirRoutes.get('/d/:token/api/file', (c) => {
   const rawUrl = `${baseUrl}/d/${c.req.param('token')}/raw?path=${encodeURIComponent(relPath)}`;
 
   if (fileType === 'image' || fileType === 'svg') {
+    recordRouteAccess(c, row!.token, 'dir', 'api_preview', relPath);
     return c.json({ type: 'image', url: rawUrl, size: fileSize, mtime: fileMtime });
   }
 
   if (fileType === 'pdf') {
+    recordRouteAccess(c, row!.token, 'dir', 'api_preview', relPath);
     return c.json({ type: 'pdf', url: rawUrl, size: fileSize, mtime: fileMtime });
   }
 
@@ -190,15 +196,18 @@ dirRoutes.get('/d/:token/api/file', (c) => {
     const renderer = getRenderer(absPath);
     if (renderer) {
       const htmlContent = renderer(absPath);
+      recordRouteAccess(c, row!.token, 'dir', 'api_preview', relPath);
       return c.json({ type: 'html', content: htmlContent, size: fileSize, mtime: fileMtime });
     }
   }
 
   if (fileType === 'media') {
+    recordRouteAccess(c, row!.token, 'dir', 'api_preview', relPath);
     return c.json({ type: 'media', url: rawUrl, filename: basename(absPath), size: fileSize, mtime: fileMtime });
   }
 
   // Binary / unknown / oversized
+  recordRouteAccess(c, row!.token, 'dir', 'api_preview', relPath);
   return c.json({ type: 'binary', filename: basename(absPath), size: fileSize, mtime: fileMtime, url: rawUrl });
 });
 
@@ -218,6 +227,7 @@ dirRoutes.get('/d/:token/raw', (c) => {
   const contentType = guessMime(absPath);
 
   const data = readFileSync(absPath);
+  recordRouteAccess(c, row!.token, 'dir', 'raw_view', relPath);
   return new Response(data, {
     headers: {
       'Content-Type': contentType,
@@ -249,8 +259,10 @@ dirRoutes.get('/d/:token/*', (c) => {
   const result = renderDirBrowser(row!, filepath, c.req.param('token'));
   if (typeof result === 'string') {
     if (result === 'Directory no longer exists on disk') return c.text(result, 404);
+    recordRouteAccess(c, row!.token, 'dir', 'page_view', filepath);
     return c.html(result);
   }
+  recordRouteAccess(c, row!.token, 'dir', 'page_view', filepath);
   return result;
 });
 
