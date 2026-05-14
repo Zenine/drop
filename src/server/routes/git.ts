@@ -62,13 +62,13 @@ gitRoutes.get('/git/:token', (c) => {
     : '';
 
   return c.html(gitPageHtml({
-    repoPath: htmlEscape(repoDisplay),
+    repoPath: repoDisplay,
     shortHash,
     fullHash: info.hash,
-    authorName: htmlEscape(info.author_name),
-    authorEmail: htmlEscape(info.author_email),
-    date: htmlEscape(info.date),
-    subject: htmlEscape(info.subject),
+    authorName: info.author_name,
+    authorEmail: info.author_email,
+    date: info.date,
+    subject: info.subject,
     bodyHtml,
     filesHtml: filesHtml.join('\n'),
     fileCount: info.files.length,

@@ -151,7 +151,7 @@ drop config get base_url
 | Markdown (`.md`) | Rendered HTML with theme/font controls |
 | CSV/TSV | Styled HTML table |
 | PDF | Browser's native PDF viewer |
-| SVG | Inline rendering |
+| SVG | Image preview via data URI |
 | Audio/Video | HTML5 player |
 | Images | Displayed inline |
 | Git commits | Metadata + expandable syntax-highlighted diffs |
@@ -160,11 +160,12 @@ drop config get base_url
 ## Security
 
 - **Time-limited access**: nothing accessible until explicitly shared with a TTL
-- **Token entropy**: 8 hex chars (files), 12 hex chars (directories), 32 hex chars (owner key)
-- **Rate limiting**: 60 requests/min per IP
+- **Token entropy**: at least 32 hex chars / 128 bits (files, directories, Git shares), 32 hex chars (owner key)
+- **Rate limiting**: 300 requests/min per client identity; proxy headers are ignored unless `DROP_TRUST_PROXY=1` is set behind a trusted proxy
 - **Path traversal**: strict prefix checks, symlink validation
 - **Anti-crawler**: `robots.txt`, `X-Robots-Tag`, `noindex` meta tags
 - **Owner auth**: HMAC-signed cookies, timing-safe key comparison
+- **Preview escaping**: Markdown raw HTML is escaped, SVG is rendered as an image preview, and template-controlled metadata is HTML-escaped
 
 ## Deploying
 

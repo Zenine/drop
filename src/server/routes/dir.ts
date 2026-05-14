@@ -5,14 +5,14 @@
 
 import { Hono } from 'hono';
 import { existsSync, statSync, readFileSync } from 'fs';
-import { join, dirname, basename, extname } from 'path';
+import { join, basename, extname } from 'path';
 import { lookupDirAuthorization } from '../../db/dir-authorizations.js';
 import {
   STATUS_NOT_FOUND, STATUS_EXPIRED, MAX_RENDER_SIZE,
 } from '../../shared/constants.js';
 import { loadConfig } from '../../shared/config.js';
 import { walkDirectory, getFileType, isExcluded } from '../../shared/fs.js';
-import { htmlEscape, jsSafeJson, jsStringEscape, isSafeSubpath } from '../../shared/utils.js';
+import { jsSafeJson, isSafeSubpath } from '../../shared/utils.js';
 import { handleExpired } from '../middleware/auth.js';
 import { dirBrowserShellHtml } from '../render/html-templates.js';
 import { getRenderer } from '../render/index.js';
@@ -105,12 +105,12 @@ function renderDirBrowser(row: DirAuthorization, initialFile: string = ''): stri
   const basePath = (cfg.base_url as string || '').replace(/\/$/, '');
 
   let html = dirBrowserShellHtml({
-    dirname: htmlEscape(row.dirname),
+    dirname: row.dirname,
     token: row.token,
     treeJson: jsSafeJson(tree),
     expiresAt: `${Math.floor(row.expires_at)}`,
-    initialFile: jsStringEscape(initialFile),
-    basePath: jsStringEscape(basePath),
+    initialFile,
+    basePath,
   });
 
   if (row.live && html.includes('</body>')) {

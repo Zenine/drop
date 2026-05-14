@@ -5,6 +5,15 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { htmlEscape, jsSafeJson } from '../../shared/utils.js';
+
+function h(value: unknown): string {
+  return htmlEscape(String(value));
+}
+
+function attr(value: unknown): string {
+  return h(value);
+}
 
 export interface BaseHtmlOpts {
   title: string;
@@ -21,7 +30,7 @@ export function baseHtml(opts: BaseHtmlOpts): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
-<title>${opts.title}</title>
+<title>${h(opts.title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@100..900&family=Roboto+Mono:wght@100..700&display=swap" rel="stylesheet">
@@ -127,8 +136,8 @@ export function codePageHtml(opts: CodePageOpts): string {
   }`,
     body: `
   <div class="file-header">
-    <div class="file-path">${opts.displayPath}</div>
-    <div class="file-meta">${opts.fileMeta}</div>
+    <div class="file-path">${h(opts.displayPath)}</div>
+    <div class="file-meta">${h(opts.fileMeta)}</div>
   </div>
   <div class="file-content">
     ${opts.highlightedCode}
@@ -299,8 +308,8 @@ export function markdownPageHtml(opts: MarkdownPageOpts): string {
     ${opts.bodyHtml}
   </div>
   <footer class="file-footer">
-    <span class="file-footer-path">${opts.displayPath}</span>
-    <span class="file-footer-meta">${opts.fileMeta}</span>
+    <span class="file-footer-path">${h(opts.displayPath)}</span>
+    <span class="file-footer-meta">${h(opts.fileMeta)}</span>
   </footer>`,
   });
 }
@@ -376,8 +385,8 @@ export function csvPageHtml(opts: CsvPageOpts): string {
   }`,
     body: `
   <div class="file-header">
-    <div class="file-path">${opts.displayPath}</div>
-    <div class="file-meta">${opts.fileMeta}</div>
+    <div class="file-path">${h(opts.displayPath)}</div>
+    <div class="file-meta">${h(opts.fileMeta)}</div>
   </div>
   <div class="table-container">
     ${opts.bodyHtml}
@@ -442,8 +451,8 @@ export function mediaPageHtml(opts: MediaPageOpts): string {
   }`,
     body: `
   <div class="file-header">
-    <div class="file-path">${opts.displayPath}</div>
-    <div class="file-meta">${opts.fileMeta}</div>
+    <div class="file-path">${h(opts.displayPath)}</div>
+    <div class="file-meta">${h(opts.fileMeta)}</div>
   </div>
   <div class="media-container">
     ${opts.mediaHtml}
@@ -583,14 +592,14 @@ export function gitPageHtml(opts: GitPageOpts): string {
   }`,
     body: `
   <div class="commit-header">
-    <div class="commit-repo">${opts.repoPath}</div>
-    <div class="commit-subject">${opts.subject}</div>
+    <div class="commit-repo">${h(opts.repoPath)}</div>
+    <div class="commit-subject">${h(opts.subject)}</div>
     ${opts.bodyHtml}
     <div class="commit-meta">
-      <span class="hash">${opts.shortHash}</span> &middot; ${opts.authorName} &lt;${opts.authorEmail}&gt; &middot; ${opts.date}
+      <span class="hash">${h(opts.shortHash)}</span> &middot; ${h(opts.authorName)} &lt;${h(opts.authorEmail)}&gt; &middot; ${h(opts.date)}
     </div>
   </div>
-  <div class="file-summary">${opts.fileCount} files changed</div>
+  <div class="file-summary">${h(opts.fileCount)} files changed</div>
   <div class="file-list">
     ${opts.filesHtml}
   </div>`,
@@ -604,7 +613,7 @@ export interface ExpiredPageOpts {
 
 export function expiredPageHtml(opts: ExpiredPageOpts): string {
   const unlockHtml = opts.verifyUrl
-    ? `<a class="unlock" href="${opts.verifyUrl}">
+    ? `<a class="unlock" href="${attr(opts.verifyUrl)}">
         <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" style="vertical-align: -2px; margin-right: 6px;"><path d="M8 1a4 4 0 00-4 4v2H3a1 1 0 00-1 1v6a1 1 0 001 1h10a1 1 0 001-1V8a1 1 0 00-1-1h-1V5a4 4 0 00-4-4zm2.5 6H5.5V5a2.5 2.5 0 015 0v2z"/></svg>
         Unlock with password
       </a>`
@@ -676,7 +685,7 @@ export function expiredPageHtml(opts: ExpiredPageOpts): string {
     </svg>
   </div>
   <h1>This file is no longer available</h1>
-  <p><strong>${opts.filename}</strong> has expired and can no longer be accessed.</p>
+  <p><strong>${h(opts.filename)}</strong> has expired and can no longer be accessed.</p>
   ${unlockHtml}
 </div>`,
   });
@@ -688,7 +697,7 @@ export interface VerifyPageOpts {
 }
 
 export function verifyPageHtml(opts: VerifyPageOpts): string {
-  const errorHtml = opts.error ? `<p class="error">${opts.error}</p>` : '';
+  const errorHtml = opts.error ? `<p class="error">${h(opts.error)}</p>` : '';
   return baseHtml({
     title: 'Verification Required',
     extraCss: `
@@ -711,7 +720,7 @@ export function verifyPageHtml(opts: VerifyPageOpts): string {
   <h1>This content has expired</h1>
   <p class="hint">Enter password to unlock access</p>
   <form method="POST" action="/verify">
-    <input type="hidden" name="next" value="${opts.nextUrl}">
+    <input type="hidden" name="next" value="${attr(opts.nextUrl)}">
     <input type="password" name="password" placeholder="Password" autofocus>
     <button type="submit">Unlock</button>
     ${errorHtml}
@@ -745,12 +754,12 @@ export function dashboardPageHtml(opts: DashboardPageOpts): string {
       const rowClass = s.status === 'expired' ? 'expired-row' : '';
       rows += `
       <tr class="${rowClass}">
-        <td><span class="type-badge type-${s.type}">${s.type}</span></td>
-        <td class="path" title="${s.path}">${s.display_path}</td>
-        <td><a class="token-link" href="${s.url}">${s.token.slice(0, 8)}&hellip;</a></td>
-        <td>${s.created_str}</td>
-        <td>${s.expires_str}</td>
-        <td class="status-${s.status}">${s.status}</td>
+        <td><span class="type-badge type-${attr(s.type)}">${h(s.type)}</span></td>
+        <td class="path" title="${attr(s.path)}">${h(s.display_path)}</td>
+        <td><a class="token-link" href="${attr(s.url)}">${h(s.token.slice(0, 8))}&hellip;</a></td>
+        <td>${h(s.created_str)}</td>
+        <td>${h(s.expires_str)}</td>
+        <td class="status-${attr(s.status)}">${h(s.status)}</td>
       </tr>`;
     }
     tableBody = `
@@ -1402,12 +1411,12 @@ export function dirBrowserShellHtml(opts: DirBrowserShellOpts): string {
     body: `
   <div id="app"></div>
   <script>window.__DROP__ = {
-    token: "${opts.token}",
-    dirname: "${opts.dirname}",
+    token: ${jsSafeJson(opts.token)},
+    dirname: ${jsSafeJson(opts.dirname)},
     tree: ${opts.treeJson},
     expiresAt: ${opts.expiresAt},
-    initialFile: "${opts.initialFile}",
-    basePath: "${opts.basePath}"
+    initialFile: ${jsSafeJson(opts.initialFile)},
+    basePath: ${jsSafeJson(opts.basePath)}
   };</script>
   <script>${_svelteJs}</script>`,
   });
