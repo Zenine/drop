@@ -17,8 +17,9 @@ import { displayPath } from '../shared/utils.js';
 import { addAuthorization, removeAuthorization, listAuthorizations } from '../db/authorizations.js';
 import { addDirAuthorization, listDirAuthorizations } from '../db/dir-authorizations.js';
 import { addGitAuthorization } from '../db/git-authorizations.js';
-import { assertShareSlugAvailable, createShareAlias, lookupShareAliasByToken } from '../db/share-aliases.js';
+import { assertShareSlugAvailable, createShareAlias, lookupShareAlias, lookupShareAliasByToken } from '../db/share-aliases.js';
 import { getDb } from '../db/index.js';
+import { getAccessStats, getAggregateAccessStats, listAccessStats, parseStatsSince } from '../db/access-events.js';
 import { buildUrl } from './url.js';
 import { outputShareError, outputShareResult } from './output.js';
 import { VALID_CONFIG_KEYS, applyConfigValue, getConfigValue, isValidConfigKey } from './config.js';
@@ -93,12 +94,6 @@ function applySlug(
   if (!slug) return { publicId: token, url: buildUrl(cfg, prefix, token, port, host) };
   const alias = createShareAlias(slug, type, token);
   return { publicId: alias.slug, slug: alias.slug, url: buildUrl(cfg, prefix, alias.slug, port, host) };
-}
-
-function warnGuessableBearerUrl(opts: { json?: boolean; slug?: string }): void {
-  if (opts.slug && !opts.json) {
-    console.error('Warning: custom slug creates a guessable bearer URL; anyone with the URL can access this share.');
-  }
 }
 
 // --- CLI setup ---
@@ -484,6 +479,47 @@ program
       console.log(`Revoked: ${token}`);
     } else {
       console.error(`Token not found: ${token}`);
+    }
+  });
+
+
+// stats
+program
+  .command('stats')
+  .description('Show access statistics for all shares or a single token')
+  .argument('[token]', 'Token to show stats for')
+  .option('--json', 'Output result as JSON', false)
+  .option('--since <window>', 'Stats window: 24h, 7d, or 30d')
+  .option('--include-live', 'Include live polling events in view counts', false)
+  .action((token, opts) => {
+    let since: number | undefined;
+    try {
+      since = parseStatsSince(opts.since);
+    } catch (e: any) {
+      console.error(e.message);
+      process.exit(1);
+    }
+    const statsOpts = { since, includeLive: Boolean(opts.includeLive) };
+    const resolvedToken = token ? (lookupShareAlias(token)?.token || token) : undefined;
+    const result = resolvedToken
+      ? getAccessStats(resolvedToken, statsOpts)
+      : { totals: getAggregateAccessStats(statsOpts), tokens: listAccessStats(statsOpts) };
+
+    if (opts.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (resolvedToken) {
+      const item = result as ReturnType<typeof getAccessStats>;
+      console.log(`${token}: ${item.views} views, ${item.unique} unique, last access ${item.last_access_at ? new Date(item.last_access_at * 1000).toISOString() : 'never'}`);
+      return;
+    }
+
+    const aggregate = result as { totals: ReturnType<typeof getAggregateAccessStats>; tokens: ReturnType<typeof listAccessStats> };
+    console.log(`Total: ${aggregate.totals.views} views, ${aggregate.totals.unique} unique`);
+    for (const item of aggregate.tokens) {
+      console.log(`  ${item.token}  ${item.views} views  ${item.unique} unique  last=${item.last_access_at ? new Date(item.last_access_at * 1000).toISOString() : 'never'}`);
     }
   });
 

@@ -7,6 +7,7 @@ import { loadConfig, getOwnerKey } from '../../shared/config.js';
 import { STATUS_ACTIVE } from '../../shared/constants.js';
 import { displayPath, formatTime } from '../../shared/utils.js';
 import { listAllAuthorizations } from '../../db/cleanup.js';
+import { getAccessStats } from '../../db/access-events.js';
 import { checkOwnerAuth, setOwnerCookie, safeCompare } from '../middleware/auth.js';
 import { dashboardPageHtml } from '../render/html-templates.js';
 
@@ -38,6 +39,7 @@ dashboardRoutes.get('/dashboard', (c) => {
 
   const formattedShares = shares.map(s => {
     const publicId = s.slug || s.token;
+    const stats = getAccessStats(s.token);
     return {
       type: s.type,
       display_path: displayPath(s.path),
@@ -48,6 +50,9 @@ dashboardRoutes.get('/dashboard', (c) => {
       url: baseUrl ? `${baseUrl}${prefixMap[s.type]}${publicId}` : `${prefixMap[s.type]}${publicId}`,
       created_str: formatTime(s.created_at),
       expires_str: formatTime(s.expires_at),
+      views: stats.views,
+      unique: stats.unique,
+      last_access_str: stats.last_access_at ? formatTime(stats.last_access_at) : '—',
       status: s.status,
     };
   });
