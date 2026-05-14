@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-REPO="junping1/drop"
+REPO="${DROP_REPO:-junping1/drop}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 
 # Detect platform

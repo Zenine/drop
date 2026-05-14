@@ -84,9 +84,10 @@ function renderMedia(filepath: string): string {
 }
 
 function renderSvg(filepath: string): string {
-  const svgContent = readFileSync(filepath, 'utf-8');
+  const svgContent = readFileSync(filepath);
   const meta = getFileMeta(filepath);
-  const mediaHtml = `<div class="svg-container">${svgContent}</div>`;
+  const dataUri = `data:image/svg+xml;base64,${svgContent.toString('base64')}`;
+  const mediaHtml = `<div class="svg-container"><img src="${dataUri}" alt=""></div>`;
 
   return mediaPageHtml({
     displayPath: meta.display_path,

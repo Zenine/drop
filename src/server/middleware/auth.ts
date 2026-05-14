@@ -11,7 +11,6 @@ import { loadConfig } from '../../shared/config.js';
 import { DEFAULT_TTL, DIR_DEFAULT_TTL, STATUS_ACTIVE } from '../../shared/constants.js';
 import { getDb } from '../../db/index.js';
 import { expiredPageHtml } from '../render/html-templates.js';
-import { htmlEscape } from '../../shared/utils.js';
 
 const ALLOWED_TABLES = new Set(['authorizations', 'git_authorizations', 'dir_authorizations']);
 
@@ -134,7 +133,7 @@ export function handleExpired(
 
   const verifyUrl = password ? `/verify?next=${c.req.path}` : '';
   return expiredPageHtml({
-    filename: htmlEscape(String(row[nameField])),
+    filename: String(row[nameField]),
     verifyUrl,
   });
 }

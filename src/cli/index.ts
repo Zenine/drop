@@ -1,160 +1,25 @@
 #!/usr/bin/env bun
 
 import { Command } from 'commander';
-import { resolve, basename } from 'path';
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'fs';
+import { resolve } from 'path';
+import { existsSync, writeFileSync, mkdirSync, statSync } from 'fs';
 import { randomBytes } from 'crypto';
 
 import {
   DEFAULT_PORT, DEFAULT_HOST, DEFAULT_TTL, DIR_DEFAULT_TTL,
   DEFAULT_EXCLUDES, SHARES_DIR, SHARE_TYPE_MAP, MAX_SHARE_SIZE,
-  TUNNEL_URL_PATH, PID_PATH, LOG_PATH,
   STATUS_ACTIVE, STATUS_EXPIRED,
   ensureStateDir,
 } from '../shared/constants.js';
 import { loadConfig, saveConfig, getOwnerKey } from '../shared/config.js';
 import { displayPath } from '../shared/utils.js';
-import { addAuthorization, removeAuthorization, listAuthorizations, hasActiveAuthorizations } from '../db/authorizations.js';
+import { addAuthorization, removeAuthorization, listAuthorizations } from '../db/authorizations.js';
 import { addDirAuthorization, listDirAuthorizations } from '../db/dir-authorizations.js';
 import { addGitAuthorization } from '../db/git-authorizations.js';
-import { cleanupExpiredShares } from '../db/cleanup.js';
 import { getDb } from '../db/index.js';
-
-// --- PID / daemon helpers ---
-
-function readPid(): number | null {
-  if (!existsSync(PID_PATH)) return null;
-  const content = readFileSync(PID_PATH, 'utf-8').trim();
-  if (!content) return null;
-  return parseInt(content, 10);
-}
-
-function writePid(): void {
-  ensureStateDir();
-  writeFileSync(PID_PATH, String(process.pid));
-}
-
-function removePid(): void {
-  if (existsSync(PID_PATH)) {
-    try { unlinkSync(PID_PATH); } catch { /* ignore */ }
-  }
-}
-
-function isDaemonRunning(): boolean {
-  const pid = readPid();
-  if (pid === null) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e: any) {
-    if (e.code === 'ESRCH') {
-      removePid();
-      return false;
-    }
-    // EPERM means process exists but we can't signal it
-    return true;
-  }
-}
-
-function startDaemon(port: number, host: string): void {
-  ensureStateDir();
-  const logFile = Bun.file(LOG_PATH);
-  const proc = Bun.spawn(
-    [process.argv[0], resolve(import.meta.dir, 'index.ts'), 'serve', '--port', String(port), '--host', host],
-    {
-      stdout: 'pipe',
-      stderr: 'pipe',
-      stdin: 'ignore',
-    },
-  );
-  // Give it a moment to start
-  setTimeout(() => {
-    if (proc.exitCode !== null) {
-      console.error('Warning: daemon process exited immediately, check ~/.drop/drop.log');
-    } else {
-      console.error(`Daemon started (pid ${proc.pid})`);
-    }
-  }, 300);
-}
-
-function stopDaemon(): boolean {
-  const pid = readPid();
-  if (pid === null) return false;
-  try {
-    process.kill(pid, 'SIGTERM');
-    return true;
-  } catch (e: any) {
-    if (e.code === 'ESRCH') {
-      removePid();
-      return false;
-    }
-    return false;
-  }
-}
-
-function startCleanupTimer(): void {
-  const CLEANUP_INTERVAL = 60_000; // ms
-  setInterval(() => {
-    cleanupExpiredShares();
-    if (!hasActiveAuthorizations()) {
-      console.error('All authorizations expired, shutting down.');
-      removePid();
-      process.exit(0);
-    }
-  }, CLEANUP_INTERVAL);
-}
-
-// --- URL building ---
-
-function buildUrl(cfg: Record<string, any>, prefix: string, token: string, port: number, host = 'localhost'): string {
-  // Tunnel URL takes highest priority
-  if (existsSync(TUNNEL_URL_PATH)) {
-    const tunnelUrl = readFileSync(TUNNEL_URL_PATH, 'utf-8').trim();
-    if (tunnelUrl) return `${tunnelUrl.replace(/\/$/, '')}/${prefix}/${token}`;
-  }
-  const baseUrl = cfg.base_url as string | undefined;
-  if (baseUrl) return `${baseUrl.replace(/\/$/, '')}/${prefix}/${token}`;
-  return `http://${host}:${port}/${prefix}/${token}`;
-}
-
-// --- Config helpers ---
-
-const VALID_CONFIG_KEYS = [
-  'base_url', 'port', 'file_ttl', 'dir_default_ttl', 'auto_stop',
-  'password', 'default_excludes', 'pygments.style', 'pygments.linenos',
-];
-
-function getNested(cfg: Record<string, any>, key: string): unknown {
-  const parts = key.split('.');
-  let value: any = cfg;
-  for (const part of parts) {
-    if (typeof value !== 'object' || value === null) return undefined;
-    value = value[part];
-    if (value === undefined) return undefined;
-  }
-  return value;
-}
-
-function setNested(cfg: Record<string, any>, key: string, value: string): void {
-  const parts = key.split('.');
-  let target: any = cfg;
-  for (const part of parts.slice(0, -1)) {
-    if (!(part in target) || typeof target[part] !== 'object') {
-      target[part] = {};
-    }
-    target = target[part];
-  }
-  const lastKey = parts[parts.length - 1];
-  if (key === 'pygments.linenos') {
-    target[lastKey] = ['true', '1', 'yes', 'table', 'inline'].includes(value.toLowerCase());
-  } else if (key === 'auto_stop') {
-    target[lastKey] = ['true', '1', 'yes'].includes(value.toLowerCase());
-  } else if (key === 'file_ttl' || key === 'port') {
-    target[lastKey] = parseInt(value, 10);
-  } else {
-    target[lastKey] = value;
-  }
-}
+import { buildUrl } from './url.js';
+import { VALID_CONFIG_KEYS, applyConfigValue, getConfigValue, isValidConfigKey } from './config.js';
+import { isDaemonRunning, readPid, removePid, startCleanupTimer, startDaemon, stopDaemon, writePid } from './daemon.js';
 
 // --- CLI setup ---
 
@@ -211,15 +76,15 @@ program
   .option('--exclude <pattern...>', 'Additional exclude patterns for directory shares')
   .option('--live', 'Enable live preview (auto-refresh on file changes)', false)
   .option('--json', 'Output result as JSON', false)
-  .action((path, opts) => {
+  .action(async (path, opts) => {
     ensureStateDir();
     const absPath = resolve(path);
     const cfg = loadConfig();
     const port = cfg.port || parseInt(opts.port, 10);
     const host = opts.host;
 
-    const isDir = existsSync(absPath) && require('fs').statSync(absPath).isDirectory();
-    const isFile = existsSync(absPath) && require('fs').statSync(absPath).isFile();
+    const isDir = existsSync(absPath) && statSync(absPath).isDirectory();
+    const isFile = existsSync(absPath) && statSync(absPath).isFile();
 
     if (isDir) {
       const ttl = opts.ttl ? parseInt(opts.ttl, 10) : (cfg.dir_default_ttl || DIR_DEFAULT_TTL);
@@ -239,7 +104,7 @@ program
         if (opts.live) console.error('(live preview enabled)');
       }
 
-      if (!isDaemonRunning()) startDaemon(port, DEFAULT_HOST);
+      if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
     } else if (isFile) {
       const ttl = opts.ttl ? parseInt(opts.ttl, 10) : (cfg.file_ttl || DEFAULT_TTL);
       const { token, filename, isNew } = addAuthorization(path, ttl, opts.live);
@@ -259,7 +124,7 @@ program
         if (opts.live) console.error('(live preview enabled)');
       }
 
-      if (!isDaemonRunning()) startDaemon(port, DEFAULT_HOST);
+      if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
     } else {
       if (opts.json) {
         console.log(JSON.stringify({ error: `Path not found: ${absPath}` }));
@@ -319,7 +184,7 @@ program
       console.log(url);
     }
 
-    if (!isDaemonRunning()) startDaemon(port, DEFAULT_HOST);
+    if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
   });
 
 // allow-git
@@ -331,7 +196,7 @@ program
   .option('--ttl <seconds>', 'Time-to-live in seconds')
   .option('--port <port>', 'Port for URL generation', String(DEFAULT_PORT))
   .option('--json', 'Output result as JSON', false)
-  .action((repoPath, commitHash, opts) => {
+  .action(async (repoPath, commitHash, opts) => {
     ensureStateDir();
     const cfg = loadConfig();
     const port = cfg.port || parseInt(opts.port, 10);
@@ -352,7 +217,7 @@ program
         if (!isNew) console.error('(existing authorization extended)');
       }
 
-      if (!isDaemonRunning()) startDaemon(port, DEFAULT_HOST);
+      if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
     } catch (e: any) {
       if (opts.json) {
         console.log(JSON.stringify({ error: e.message }));
@@ -479,7 +344,7 @@ program
 // revoke
 program
   .command('revoke')
-  .description('Revoke access to a file by its token')
+  .description('Revoke access to a file, directory, or git share by its token')
   .argument('<token>', 'Token to revoke')
   .action((token) => {
     if (removeAuthorization(token)) {
@@ -516,14 +381,15 @@ configCmd
   .argument('<key>', 'Config key')
   .argument('<value>', 'Config value')
   .action((key, value) => {
-    if (!VALID_CONFIG_KEYS.includes(key)) {
-      console.error(`Unknown config key: ${key}. Valid keys: ${VALID_CONFIG_KEYS.join(', ')}`);
+    try {
+      const cfg = loadConfig();
+      applyConfigValue(cfg, key, value);
+      saveConfig(cfg);
+      console.log(`${key} = ${getConfigValue(cfg, key)}`);
+    } catch (e: any) {
+      console.error(e.message);
       process.exit(1);
     }
-    const cfg = loadConfig();
-    setNested(cfg, key, value);
-    saveConfig(cfg);
-    console.log(`${key} = ${getNested(cfg, key)}`);
   });
 
 configCmd
@@ -531,12 +397,12 @@ configCmd
   .description('Get a config value')
   .argument('<key>', 'Config key')
   .action((key) => {
-    if (!VALID_CONFIG_KEYS.includes(key)) {
+    if (!isValidConfigKey(key)) {
       console.error(`Unknown config key: ${key}. Valid keys: ${VALID_CONFIG_KEYS.join(', ')}`);
       process.exit(1);
     }
     const cfg = loadConfig();
-    const value = getNested(cfg, key);
+    const value = getConfigValue(cfg, key);
     if (value === undefined) {
       console.log(`${key}: (not set)`);
     } else {

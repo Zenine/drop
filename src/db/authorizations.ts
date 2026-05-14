@@ -42,8 +42,10 @@ export function addAuthorization(
 
 export function removeAuthorization(token: string): boolean {
   const db = getDb();
-  const result = db.query('DELETE FROM authorizations WHERE token = ?').run(token);
-  return result.changes > 0;
+  const fileResult = db.query('DELETE FROM authorizations WHERE token = ?').run(token);
+  const dirResult = db.query('DELETE FROM dir_authorizations WHERE token = ?').run(token);
+  const gitResult = db.query('DELETE FROM git_authorizations WHERE token = ?').run(token);
+  return (fileResult.changes + dirResult.changes + gitResult.changes) > 0;
 }
 
 export function listAuthorizations(): FileAuthorization[] {
