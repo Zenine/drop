@@ -16,6 +16,7 @@
 
 ### 修复
 
+- 修复打包后二进制在无 `node_modules` 环境中渲染代码预览时仍尝试通过 `highlight.js/package.json` 解析主题 CSS，导致 `drop serve --tunnel` 等服务启动或访问代码预览报缺失依赖的问题；现在 highlight.js 主题 CSS 会在构建时内嵌进二进制。
 - 修复编译后二进制自动启动 daemon 时错误执行 `bun serve` 的问题；现在源码模式和二进制模式都会构造正确的 daemon 启动命令。
 - 修复后台自动启动的 daemon 可能在父进程退出后结束的问题；现在使用 `nohup` 并显式保持 `serve` 进程存活。
 
@@ -28,6 +29,7 @@
 
 ### 测试
 
+- 新增打包回归测试，防止代码渲染器重新引入运行时 `highlight.js/package.json` 依赖。
 - 新增 QR 输出测试，覆盖 stderr/stdout 分离、JSON 可解析性和失败降级。
 - 新增密钥扫描单元与 CLI 集成测试，覆盖文件、目录、stdin、Git commit、`--force`、`--no-secret-scan` 和脱敏输出。
 - 新增 slug 测试，覆盖格式校验、保留词、唯一性、路由访问、dashboard 展示、CLI 输出和撤销。
