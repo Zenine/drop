@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-验证：2026-05-14 在本机运行 `scripts/verify.sh` 通过，包含 `tsc --noEmit`、`bun test`（59 pass / 0 fail）和 `bun run scripts/build.ts`。
+验证：2026-05-14 在本机运行 `scripts/verify.sh` 通过，包含 `tsc --noEmit`、`bun test`（60 pass / 0 fail）和 `bun run scripts/build.ts`；并完成本地二进制、自动启动、slug、密钥扫描、QR 输出和访问统计冒烟测试。
 
 ### 新增
 
@@ -13,6 +13,11 @@
 - 新增自定义分享别名：分享命令支持 `--slug`，可生成 `/f/:slug`、`/d/:slug` 和 `/git/:slug` 可读 URL；`drop list --json` 展示 slug URL，`drop revoke <token-or-slug>` 支持 token 或 slug。
 - 新增隐私保护访问日志和统计：记录成功访问事件，新增 `drop stats`、owner-only `/api/stats` 与 `/api/stats/:token-or-slug`，dashboard 展示 Views、Unique 和 Last access。
 - 新增数据库表：`share_aliases` 用于 slug 映射，`access_events` 用于访问事件统计。
+
+### 修复
+
+- 修复编译后二进制自动启动 daemon 时错误执行 `bun serve` 的问题；现在源码模式和二进制模式都会构造正确的 daemon 启动命令。
+- 修复后台自动启动的 daemon 可能在父进程退出后结束的问题；现在使用 `nohup` 并显式保持 `serve` 进程存活。
 
 ### 安全
 
@@ -31,3 +36,4 @@
 ### 文档
 
 - 更新 `README.md` 和 `README.zh-CN.md`，补充 QR、密钥扫描、自定义 slug、访问统计、安全边界和使用示例。
+- 补充 Cloudflare Tunnel named tunnel 的 `127.0.0.1:17173` 配置建议和本地/公网冒烟测试步骤。
