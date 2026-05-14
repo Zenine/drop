@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import { existsSync, statSync, readFileSync } from 'fs';
 import { join, basename } from 'path';
 import { lookupDirAuthorization } from '../../db/dir-authorizations.js';
+import { resolveShareToken } from '../../db/share-aliases.js';
 import {
   STATUS_NOT_FOUND, STATUS_EXPIRED, MAX_RENDER_SIZE,
 } from '../../shared/constants.js';
@@ -21,23 +22,24 @@ import type { DirAuthorization } from '../../shared/types.js';
 
 const dirRoutes = new Hono();
 
-function getDirAuth(c: any): { row: DirAuthorization | null; expiredHtml: string | null } {
-  const token = c.req.param('token');
+function getDirAuth(c: any): { row: DirAuthorization | null; expiredHtml: string | null; publicId: string } {
+  const publicId = c.req.param('token');
+  const token = resolveShareToken('dir', publicId);
   const { row, status } = lookupDirAuthorization(token);
 
   if (status === STATUS_NOT_FOUND) {
-    return { row: null, expiredHtml: null };
+    return { row: null, expiredHtml: null, publicId };
   }
 
   if (status === STATUS_EXPIRED) {
     const html = handleExpired(c, row!, 'dirname', token, 'dir_authorizations');
     if (html !== null) {
-      return { row: null, expiredHtml: html };
+      return { row: null, expiredHtml: html, publicId };
     }
     // Owner/password auth extended — continue
   }
 
-  return { row: row!, expiredHtml: null };
+  return { row: row!, expiredHtml: null, publicId };
 }
 
 function getExcludes(row: DirAuthorization): string[] {
@@ -93,7 +95,7 @@ function injectLiveJs(html: string, token: string): string {
   return html.replace('</body>', script + '</body>');
 }
 
-function renderDirBrowser(row: DirAuthorization, initialFile: string = ''): string | Response {
+function renderDirBrowser(row: DirAuthorization, initialFile: string = '', publicId: string = row.token): string | Response {
   const dirpath = row.dirpath;
   if (!existsSync(dirpath) || !statSync(dirpath).isDirectory()) {
     return 'Directory no longer exists on disk';
@@ -107,7 +109,7 @@ function renderDirBrowser(row: DirAuthorization, initialFile: string = ''): stri
 
   let html = dirBrowserShellHtml({
     dirname: row.dirname,
-    token: row.token,
+    token: publicId,
     treeJson: jsSafeJson(tree),
     expiresAt: `${Math.floor(row.expires_at)}`,
     initialFile,
@@ -115,7 +117,7 @@ function renderDirBrowser(row: DirAuthorization, initialFile: string = ''): stri
   });
 
   if (row.live && html.includes('</body>')) {
-    html = injectLiveJs(html, row.token);
+    html = injectLiveJs(html, publicId);
   }
 
   return html;
@@ -127,7 +129,7 @@ dirRoutes.get('/d/:token', (c) => {
   if (!row && !expiredHtml) return c.text('Not found', 404);
   if (expiredHtml) return c.html(expiredHtml);
 
-  const result = renderDirBrowser(row!);
+  const result = renderDirBrowser(row!, '', c.req.param('token'));
   if (typeof result === 'string') {
     if (result === 'Directory no longer exists on disk') return c.text(result, 404);
     return c.html(result);
@@ -144,7 +146,7 @@ dirRoutes.get('/d/:token/api/tree', (c) => {
   const excludes = getExcludes(row!);
   const tree = walkDirectory(row!.dirpath, excludes);
 
-  return c.json({ tree, dirname: row!.dirname, token: row!.token });
+  return c.json({ tree, dirname: row!.dirname, token: c.req.param('token') });
 });
 
 // API: file preview
@@ -174,7 +176,7 @@ dirRoutes.get('/d/:token/api/file', (c) => {
     // ignore
   }
 
-  const rawUrl = `${baseUrl}/d/${row!.token}/raw?path=${encodeURIComponent(relPath)}`;
+  const rawUrl = `${baseUrl}/d/${c.req.param('token')}/raw?path=${encodeURIComponent(relPath)}`;
 
   if (fileType === 'image' || fileType === 'svg') {
     return c.json({ type: 'image', url: rawUrl, size: fileSize, mtime: fileMtime });
@@ -244,7 +246,7 @@ dirRoutes.get('/d/:token/*', (c) => {
     return c.text('Not found', 404);
   }
 
-  const result = renderDirBrowser(row!, filepath);
+  const result = renderDirBrowser(row!, filepath, c.req.param('token'));
   if (typeof result === 'string') {
     if (result === 'Directory no longer exists on disk') return c.text(result, 404);
     return c.html(result);

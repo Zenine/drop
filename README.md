@@ -191,6 +191,20 @@ drop allow ~/file.py
 
 Both commands share the same file. The daemon starts automatically if it is not already running.
 
+### Custom slugs
+
+Use `--slug` when you want a readable public URL instead of only the generated token URL:
+
+```bash
+drop allow ~/report.pdf --slug q2-report
+drop share --content "hello" --slug hello-note
+drop allow-git . HEAD --slug release-review
+```
+
+Slug links use the same bearer-link security model as token links: `/f/:slug`, `/d/:slug`, and `/git/:slug` are accessible to anyone who knows the URL until the share expires or is revoked. The original token URL remains valid. Slugs are global, lowercased, 3-64 characters, may contain letters, numbers, `_`, and `-`, and must start and end with a letter or number. Route names such as `api`, `raw`, `dashboard`, `f`, `d`, `git`, `list`, and `revoke` are reserved. Non-JSON output prints a warning because custom slugs are easier to guess.
+
+`drop list --json` includes `slug` and the public `url` when a slug exists, and `drop revoke <id>` accepts either the token or slug.
+
 ### Choosing the right command
 
 | Content | Best command |
@@ -215,6 +229,7 @@ drop ~/file.py --live              # reload preview when the file changes
 drop ~/file.py --qr                # also print a terminal QR code to stderr
 drop ~/file.py --force             # scan secrets, then share even if findings exist
 drop ~/file.py --no-secret-scan    # skip the pre-share secret scan
+drop ~/file.py --slug demo-file    # readable /f/demo-file URL
 ```
 
 ### Directories
@@ -227,6 +242,7 @@ drop ~/project/ --live             # refresh when the directory changes
 drop ~/project/ --qr               # also print a terminal QR code to stderr
 drop ~/project/ --force            # scan secrets, then share even if findings exist
 drop ~/project/ --no-secret-scan   # skip the pre-share secret scan
+drop ~/project/ --slug demo-dir    # readable /d/demo-dir URL
 ```
 
 Default excludes: `.git/`, `__pycache__/`, `.env`, `node_modules/`, `.DS_Store`, `*.pyc`, `.venv/`.
@@ -240,6 +256,7 @@ drop share --content "print('hi')" --type python
 echo "# Hello" | drop share --type markdown --qr
 drop share --content "..." --force --json
 drop share --content "..." --no-secret-scan --json
+drop share --content "hello" --slug hello-note
 ```
 
 Supported types: `markdown`, `python`, `javascript`, `json`, `yaml`, `html`, `css`, `shell`, `diff`, `code`, `text`.
@@ -269,6 +286,7 @@ drop allow-git . HEAD
 drop allow-git . HEAD --qr
 drop allow-git . HEAD --force
 drop allow-git . HEAD --no-secret-scan
+drop allow-git . HEAD --slug release-review
 ```
 
 Git commit shares render commit metadata, changed files, and expandable highlighted diffs.
@@ -297,11 +315,12 @@ If QR rendering fails, the share still succeeds and Drop prints a warning to std
 | `drop share` | share stdin or inline text |
 | `drop allow-git <repo> <commit>` | share a Git commit diff |
 | `drop allow <path> --qr` | print the share URL and a terminal QR code on stderr |
+| `--slug` on share commands | create a readable bearer URL slug |
 | `--force` on share commands | scan secrets but continue when findings exist |
 | `--no-secret-scan` on share commands | skip the pre-share secret scan |
 | `drop list` | list active and expired shares |
 | `drop list --json` | list shares as JSON |
-| `drop revoke <token>` | revoke a file, directory, or Git share token |
+| `drop revoke <token-or-slug>` | revoke a file, directory, or Git share token/slug |
 | `drop owner-url` | print the owner dashboard URL |
 | `drop status` | check daemon status |
 | `drop stop` | stop the daemon |
@@ -351,7 +370,7 @@ drop config get base_url
 
 Important boundaries:
 
-- Unexpired token URLs are bearer links. Anyone with the URL can access the shared content until it expires or is revoked.
+- Unexpired token and slug URLs are bearer links. Anyone with the URL can access the shared content until it expires or is revoked. Custom slugs are human-readable and may be guessable, so do not use them for sensitive content.
 - Markdown raw HTML is escaped, SVG is rendered through an image preview, and template-controlled file metadata is HTML-escaped. Still treat shared files as bearer-link content and avoid sharing untrusted or sensitive material.
 - Avoid sharing secrets, `.env` files, API keys, OAuth credentials, database backups, or directories that may contain them.
 
