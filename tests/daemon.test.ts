@@ -19,4 +19,10 @@ describe('daemon command construction', () => {
       '/Users/me/.local/bin/drop', 'serve', '--port', '17173', '--host', '0.0.0.0',
     ]);
   });
+
+  test('uses compiled binary directly even when argv[1] is a subcommand', () => {
+    expect(buildDaemonArgs('/Users/me/.local/bin/drop', 'allow', 17173, '0.0.0.0')).toEqual([
+      '/Users/me/.local/bin/drop', 'serve', '--port', '17173', '--host', '0.0.0.0',
+    ]);
+  });
 });

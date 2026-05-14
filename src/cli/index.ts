@@ -61,6 +61,10 @@ program
       hostname: host,
       fetch: app.fetch,
     });
+    // Keep the compiled binary alive when the serve command is launched in the
+    // background by auto-start. A long interval is explicit and portable across
+    // Bun source and compiled modes.
+    await new Promise<void>(() => setInterval(() => {}, 60_000));
   });
 
 // allow
