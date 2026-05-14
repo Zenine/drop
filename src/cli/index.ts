@@ -18,6 +18,7 @@ import { addDirAuthorization, listDirAuthorizations } from '../db/dir-authorizat
 import { addGitAuthorization } from '../db/git-authorizations.js';
 import { getDb } from '../db/index.js';
 import { buildUrl } from './url.js';
+import { outputShareError, outputShareResult } from './output.js';
 import { VALID_CONFIG_KEYS, applyConfigValue, getConfigValue, isValidConfigKey } from './config.js';
 import { isDaemonRunning, readPid, removePid, startCleanupTimer, startDaemon, stopDaemon, writePid } from './daemon.js';
 
@@ -76,6 +77,7 @@ program
   .option('--exclude <pattern...>', 'Additional exclude patterns for directory shares')
   .option('--live', 'Enable live preview (auto-refresh on file changes)', false)
   .option('--json', 'Output result as JSON', false)
+  .option('--qr', 'Print a terminal QR code to stderr', false)
   .action(async (path, opts) => {
     ensureStateDir();
     const absPath = resolve(path);
@@ -96,13 +98,17 @@ program
       const url = buildUrl(cfg, 'd', token, port, host);
       const expiresAt = Date.now() / 1000 + ttl;
 
-      if (opts.json) {
-        console.log(JSON.stringify({ url, token, type: 'dir', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew }));
-      } else {
-        console.log(url);
-        if (!isNew) console.error('(existing authorization extended)');
-        if (opts.live) console.error('(live preview enabled)');
-      }
+      outputShareResult(
+        { url, token, type: 'dir', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew },
+        {
+          json: opts.json,
+          qr: opts.qr,
+          stderrMessages: [
+            ...(!isNew ? ['(existing authorization extended)'] : []),
+            ...(opts.live ? ['(live preview enabled)'] : []),
+          ],
+        },
+      );
 
       if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
     } else if (isFile) {
@@ -116,21 +122,21 @@ program
       if (opts.tail) params.push(`tail=${opts.tail}`);
       if (params.length) url += '?' + params.join('&');
 
-      if (opts.json) {
-        console.log(JSON.stringify({ url, token, type: 'file', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew }));
-      } else {
-        console.log(url);
-        if (!isNew) console.error('(existing authorization extended)');
-        if (opts.live) console.error('(live preview enabled)');
-      }
+      outputShareResult(
+        { url, token, type: 'file', path: absPath, ttl, expires_at: expiresAt, live: opts.live, is_new: isNew },
+        {
+          json: opts.json,
+          qr: opts.qr,
+          stderrMessages: [
+            ...(!isNew ? ['(existing authorization extended)'] : []),
+            ...(opts.live ? ['(live preview enabled)'] : []),
+          ],
+        },
+      );
 
       if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
     } else {
-      if (opts.json) {
-        console.log(JSON.stringify({ error: `Path not found: ${absPath}` }));
-      } else {
-        console.error(`Path not found: ${absPath}`);
-      }
+      outputShareError(`Path not found: ${absPath}`, { json: opts.json, qr: opts.qr });
       process.exit(1);
     }
   });
@@ -146,6 +152,7 @@ program
   .option('--port <port>', 'Port for URL generation', String(DEFAULT_PORT))
   .option('--host <host>', 'Host for URL generation', 'localhost')
   .option('--json', 'Output result as JSON', false)
+  .option('--qr', 'Print a terminal QR code to stderr', false)
   .action(async (opts) => {
     ensureStateDir();
 
@@ -178,11 +185,10 @@ program
     const { token, isNew } = addAuthorization(filepath, ttl);
     const url = buildUrl(cfg, 'f', token, port, opts.host);
 
-    if (opts.json) {
-      console.log(JSON.stringify({ url, token, type: opts.type, path: filepath, ttl, expires_at: Date.now() / 1000 + ttl }));
-    } else {
-      console.log(url);
-    }
+    outputShareResult(
+      { url, token, type: opts.type, path: filepath, ttl, expires_at: Date.now() / 1000 + ttl },
+      { json: opts.json, qr: opts.qr },
+    );
 
     if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
   });
@@ -196,6 +202,7 @@ program
   .option('--ttl <seconds>', 'Time-to-live in seconds')
   .option('--port <port>', 'Port for URL generation', String(DEFAULT_PORT))
   .option('--json', 'Output result as JSON', false)
+  .option('--qr', 'Print a terminal QR code to stderr', false)
   .action(async (repoPath, commitHash, opts) => {
     ensureStateDir();
     const cfg = loadConfig();
@@ -206,24 +213,22 @@ program
       const { token, isNew } = addGitAuthorization(repoPath, commitHash, ttl);
       const url = buildUrl(cfg, 'git', token, port);
 
-      if (opts.json) {
-        console.log(JSON.stringify({
+      outputShareResult(
+        {
           url, token, type: 'git',
           repo_path: resolve(repoPath), commit_hash: commitHash,
           ttl, expires_at: Date.now() / 1000 + ttl,
-        }));
-      } else {
-        console.log(url);
-        if (!isNew) console.error('(existing authorization extended)');
-      }
+        },
+        {
+          json: opts.json,
+          qr: opts.qr,
+          stderrMessages: !isNew ? ['(existing authorization extended)'] : [],
+        },
+      );
 
       if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
     } catch (e: any) {
-      if (opts.json) {
-        console.log(JSON.stringify({ error: e.message }));
-      } else {
-        console.error(e.message);
-      }
+      outputShareError(e.message, { json: opts.json, qr: opts.qr });
       process.exit(1);
     }
   });
@@ -358,16 +363,24 @@ program
 program
   .command('owner-url')
   .description('Print the owner dashboard URL')
-  .action(() => {
+  .option('--qr', 'Print a terminal QR code to stderr', false)
+  .action((opts) => {
     const key = getOwnerKey();
     const cfg = loadConfig();
     const baseUrl = cfg.base_url as string | undefined;
     const url = baseUrl
       ? `${baseUrl.replace(/\/$/, '')}/dashboard?key=${key}`
       : `http://localhost:${DEFAULT_PORT}/dashboard?key=${key}`;
-    console.log(url);
-    console.error('Open this URL once in your browser — it sets a 30-day cookie.');
-    console.error('After that, /dashboard works without the key.');
+    outputShareResult(
+      { url },
+      {
+        qr: opts.qr,
+        stderrMessages: [
+          'Open this URL once in your browser — it sets a 30-day cookie.',
+          'After that, /dashboard works without the key.',
+        ],
+      },
+    );
   });
 
 // config

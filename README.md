@@ -212,6 +212,7 @@ drop ~/file.py --ttl 300           # expire in 5 minutes
 drop ~/file.py --head 50           # show only the first 50 lines
 drop ~/file.py --tail 50           # show only the last 50 lines
 drop ~/file.py --live              # reload preview when the file changes
+drop ~/file.py --qr                # also print a terminal QR code to stderr
 ```
 
 ### Directories
@@ -221,6 +222,7 @@ drop ~/project/                    # share a browsable file tree
 drop ~/project/ --ttl 7200         # custom TTL
 drop ~/project/ --exclude '*.log'  # add exclude patterns
 drop ~/project/ --live             # refresh when the directory changes
+drop ~/project/ --qr               # also print a terminal QR code to stderr
 ```
 
 Default excludes: `.git/`, `__pycache__/`, `.env`, `node_modules/`, `.DS_Store`, `*.pyc`, `.venv/`.
@@ -231,6 +233,7 @@ Default excludes: `.git/`, `__pycache__/`, `.env`, `node_modules/`, `.DS_Store`,
 echo "# Hello" | drop share --type markdown
 git diff | drop share --type diff --title "my changes"
 drop share --content "print('hi')" --type python
+echo "# Hello" | drop share --type markdown --qr
 ```
 
 Supported types: `markdown`, `python`, `javascript`, `json`, `yaml`, `html`, `css`, `shell`, `diff`, `code`, `text`.
@@ -240,9 +243,25 @@ Supported types: `markdown`, `python`, `javascript`, `json`, `yaml`, `html`, `cs
 ```bash
 drop allow-git /path/to/repo abc1234
 drop allow-git . HEAD
+drop allow-git . HEAD --qr
 ```
 
 Git commit shares render commit metadata, changed files, and expandable highlighted diffs.
+
+### Terminal QR codes
+
+Add `--qr` to print a terminal QR code for the generated URL. QR output is written to stderr, so stdout remains the plain URL or parseable JSON:
+
+```bash
+drop allow ~/file.py --qr
+drop allow ~/project/ --qr
+drop share --content "hello" --type text --qr
+drop allow-git . HEAD --qr
+drop owner-url --qr
+drop allow ~/file.py --json --qr | jq .
+```
+
+If QR rendering fails, the share still succeeds and Drop prints a warning to stderr. Failed share commands do not print QR output.
 
 ## Commands
 
@@ -252,6 +271,7 @@ Git commit shares render commit metadata, changed files, and expandable highligh
 | `drop allow <path>` | explicit form of `drop <path>` |
 | `drop share` | share stdin or inline text |
 | `drop allow-git <repo> <commit>` | share a Git commit diff |
+| `drop allow <path> --qr` | print the share URL and a terminal QR code on stderr |
 | `drop list` | list active and expired shares |
 | `drop list --json` | list shares as JSON |
 | `drop revoke <token>` | revoke a file, directory, or Git share token |
