@@ -363,6 +363,7 @@ bun run build:web          # build the Svelte directory browser
 bun run dev:web            # run the Svelte dev server
 bun run build              # compile the default linux-x64 standalone binary
 bun run scripts/build.ts --target darwin-x64   # build a specific target
+bun run build:release      # build all release assets expected by install.sh
 bun run verify             # run the project verification entrypoint
 ```
 
