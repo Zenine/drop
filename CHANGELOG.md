@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-验证：2026-05-14 在本机运行 `scripts/verify.sh` 通过，包含 `tsc --noEmit`、`bun test`（60 pass / 0 fail）和 `bun run scripts/build.ts`；并完成本地二进制、自动启动、slug、密钥扫描、QR 输出和访问统计冒烟测试。
+验证：2026-05-15 在本机运行 `scripts/verify.sh` 通过，包含 `tsc --noEmit`、`bun test`（62 pass / 0 fail）和 `bun run scripts/build.ts`；并完成本地二进制、自动启动、slug、密钥扫描、QR 输出和访问统计冒烟测试。
 
 ### 新增
 
