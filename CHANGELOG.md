@@ -8,6 +8,8 @@
 
 ### 新增
 
+- 新增 `bun run build:release` / `scripts/build-release.ts`，用于一次性构建 `install.sh` 期望的四个平台 release assets，并自动生成 Darwin 平台的 `drop-darwin-*` 文件名。
+- `scripts/build.ts` 新增 `--skip-web`，发布构建会复用一次前端构建产物，避免为每个平台重复执行 `vite build`。
 - 新增终端二维码输出：分享命令和 `drop owner-url` 支持 `--qr`，二维码写入 stderr，stdout 仍保持纯 URL 或可解析 JSON。
 - 新增分享前密钥扫描：文件、目录、stdin/内联内容和 Git commit 分享默认扫描高置信密钥；支持 `--force` 和 `--no-secret-scan`，扫描结果脱敏输出。
 - 新增自定义分享别名：分享命令支持 `--slug`，可生成 `/f/:slug`、`/d/:slug` 和 `/git/:slug` 可读 URL；`drop list --json` 展示 slug URL，`drop revoke <token-or-slug>` 支持 token 或 slug。
@@ -29,6 +31,7 @@
 
 ### 测试
 
+- 新增发布构建脚本 dry-run 测试，覆盖四个平台 release assets 名称和构建步骤。
 - 新增打包回归测试，防止代码渲染器重新引入运行时 `highlight.js/package.json` 依赖。
 - 新增 QR 输出测试，覆盖 stderr/stdout 分离、JSON 可解析性和失败降级。
 - 新增密钥扫描单元与 CLI 集成测试，覆盖文件、目录、stdin、Git commit、`--force`、`--no-secret-scan` 和脱敏输出。
