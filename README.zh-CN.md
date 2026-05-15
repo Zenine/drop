@@ -174,11 +174,19 @@ curl -fsSL https://raw.githubusercontent.com/owner/drop/master/install.sh | DROP
 git clone https://github.com/junping1/drop.git
 cd drop
 bun install
+
+# 构建默认的 Linux x64 二进制。
 bun run build
 cp dist/drop-linux-x64 ~/.local/bin/drop
+
+# 或指定目标平台。
+bun run scripts/build.ts --target linux-x64
+bun run scripts/build.ts --target linux-arm64
+bun run scripts/build.ts --target darwin-x64
+bun run scripts/build.ts --target darwin-arm64
 ```
 
-源码构建需要 Bun v1.0+。
+源码构建需要 Bun v1.0+。发布资产应命名为 `drop-linux-x64`、`drop-linux-arm64`、`drop-darwin-x64` 和 `drop-darwin-arm64`；发布前请查看 [发布清单](docs/RELEASE.md)。
 
 ## 使用
 
@@ -352,15 +360,12 @@ bun install
 bun run dev:serve          # 前台启动服务
 bun run build:web          # 构建 Svelte 目录浏览器
 bun run dev:web            # 运行 Svelte 开发服务
-bun run build              # 编译单文件二进制
+bun run build              # 编译默认的 linux-x64 单文件二进制
+bun run scripts/build.ts --target darwin-x64   # 构建指定目标平台
 bun run verify             # 运行项目验证入口
 ```
 
-构建脚本默认生成 `linux-x64` 二进制，也可以传入 `--target` 指定目标：
-
-```bash
-bun run scripts/build.ts --target darwin-arm64
-```
+支持的构建目标是 `linux-x64`、`linux-arm64`、`darwin-x64` 和 `darwin-arm64`。
 
 ## 许可证
 
