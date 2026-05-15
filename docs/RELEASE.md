@@ -43,24 +43,25 @@ cp dist/drop dist/drop-darwin-arm64
 
 Linux 目标默认已经输出为 `dist/drop-linux-x64` 或 `dist/drop-linux-arm64`。
 
-## 手动构建全部发布资产
+## 构建全部发布资产
+
+优先使用发布构建脚本，它会先构建一次前端资源，再按 `install.sh` 期望的文件名生成四个 release assets，并在 Darwin 目标构建后自动复制为 `drop-darwin-*` 文件名：
 
 ```bash
-rm -rf dist
 bun install
-
-bun run scripts/build.ts --target linux-x64
-bun run scripts/build.ts --target linux-arm64
-bun run scripts/build.ts --target darwin-x64
-cp dist/drop dist/drop-darwin-x64
-bun run scripts/build.ts --target darwin-arm64
-cp dist/drop dist/drop-darwin-arm64
+bun run build:release
 
 ls -lh \
   dist/drop-linux-x64 \
   dist/drop-linux-arm64 \
   dist/drop-darwin-x64 \
   dist/drop-darwin-arm64
+```
+
+可以先 dry run 检查将执行的构建步骤：
+
+```bash
+bun run scripts/build-release.ts --dry-run
 ```
 
 如果在单台机器上交叉编译失败，分别在对应 Linux/macOS 机器上运行目标构建命令，再收集四个 release assets。

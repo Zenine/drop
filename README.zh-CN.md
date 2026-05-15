@@ -362,6 +362,7 @@ bun run build:web          # 构建 Svelte 目录浏览器
 bun run dev:web            # 运行 Svelte 开发服务
 bun run build              # 编译默认的 linux-x64 单文件二进制
 bun run scripts/build.ts --target darwin-x64   # 构建指定目标平台
+bun run build:release      # 构建 install.sh 期望的全部发布资产
 bun run verify             # 运行项目验证入口
 ```
 
