@@ -39,3 +39,4 @@
 
 - 更新 `README.md` 和 `README.zh-CN.md`，补充 QR、密钥扫描、自定义 slug、访问统计、安全边界和使用示例。
 - 补充 Cloudflare Tunnel named tunnel 的 `127.0.0.1:17173` 配置建议和本地/公网冒烟测试步骤。
+- 明确 `drop serve --tunnel` 目前只是未来内置隧道支持的预留选项，现阶段需要手动运行外部 tunnel 并设置 `base_url`。

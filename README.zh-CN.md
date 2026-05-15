@@ -430,7 +430,7 @@ curl -fsS https://share.example.com/f/smoke-test | head
 drop stats smoke-test --json
 ```
 
-CLI 暴露了 `drop serve --tunnel` 选项，但在生产工作流中依赖内置隧道前，请先确认当前实现是否完整。
+`drop serve --tunnel` 是预留给未来内置隧道支持的选项，目前不会实际启动 tunnel。现阶段请手动运行 `cloudflared`、`ngrok` 或 `tailscale funnel`，然后用 `drop config set base_url <公网 URL>` 设置公开访问地址。
 
 ## 开发
 

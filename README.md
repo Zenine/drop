@@ -430,7 +430,7 @@ curl -fsS https://share.example.com/f/smoke-test | head
 drop stats smoke-test --json
 ```
 
-The CLI exposes a `drop serve --tunnel` option, but verify the current implementation before relying on built-in tunnel behavior in production workflows.
+`drop serve --tunnel` is reserved for future built-in tunnel support and does not currently start a tunnel. For now, run `cloudflared`, `ngrok`, or `tailscale funnel` yourself, then set `base_url` with `drop config set base_url <public-url>`.
 
 ## Development
 
