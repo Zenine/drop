@@ -176,11 +176,19 @@ Build from source:
 git clone https://github.com/junping1/drop.git
 cd drop
 bun install
+
+# Build the default Linux x64 binary.
 bun run build
 cp dist/drop-linux-x64 ~/.local/bin/drop
+
+# Or build for a specific platform.
+bun run scripts/build.ts --target linux-x64
+bun run scripts/build.ts --target linux-arm64
+bun run scripts/build.ts --target darwin-x64
+bun run scripts/build.ts --target darwin-arm64
 ```
 
-Source builds require Bun v1.0+.
+Source builds require Bun v1.0+. Release assets are expected to be named `drop-linux-x64`, `drop-linux-arm64`, `drop-darwin-x64`, and `drop-darwin-arm64`; see [the release checklist](docs/RELEASE.md) before publishing a release.
 
 ## Usage
 
@@ -439,9 +447,12 @@ bun install
 bun run dev:serve          # start server in foreground
 bun run build:web          # build the Svelte directory browser
 bun run dev:web            # run the Svelte dev server
-bun run build              # compile a standalone binary
+bun run build              # compile the default linux-x64 standalone binary
+bun run scripts/build.ts --target darwin-x64   # build a specific target
 bun run verify             # run the project verification entrypoint
 ```
+
+Supported build targets are `linux-x64`, `linux-arm64`, `darwin-x64`, and `darwin-arm64`.
 
 ## License
 
