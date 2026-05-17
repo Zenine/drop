@@ -20,6 +20,14 @@ import { getRenderer } from '../render/index.js';
 import { guessMime } from '../../shared/mime.js';
 import { recordRouteAccess } from '../access-logging.js';
 import type { DirAuthorization } from '../../shared/types.js';
+import {
+  DEFAULT_DIR_GIT_COMMIT_LIMIT,
+  isCommitInRecentWindow,
+  isGitRepo,
+  isShaLike,
+  listCommits,
+  renderCommitDiffHtml,
+} from '../git/repo.js';
 
 const dirRoutes = new Hono();
 
@@ -151,6 +159,55 @@ dirRoutes.get('/d/:token/api/tree', (c) => {
 
   recordRouteAccess(c, row!.token, 'dir', 'api_tree');
   return c.json({ tree, dirname: row!.dirname, token: c.req.param('token') });
+});
+
+// API: git repository status for a shared directory
+dirRoutes.get('/d/:token/api/git', (c) => {
+  const { row, expiredHtml } = getDirAuth(c);
+  if (!row && !expiredHtml) return c.text('Not found', 404);
+  if (expiredHtml) return c.text('Expired', 403);
+
+  const gitRepo = isGitRepo(row!.dirpath);
+  return c.json({
+    is_git_repo: gitRepo,
+    default_limit: DEFAULT_DIR_GIT_COMMIT_LIMIT,
+    commits_url: gitRepo ? `/d/${c.req.param('token')}/api/git/commits` : null,
+  });
+});
+
+// API: latest commits for a shared git repository directory
+dirRoutes.get('/d/:token/api/git/commits', (c) => {
+  const { row, expiredHtml } = getDirAuth(c);
+  if (!row && !expiredHtml) return c.text('Not found', 404);
+  if (expiredHtml) return c.text('Expired', 403);
+  if (!isGitRepo(row!.dirpath)) return c.json({ limit: DEFAULT_DIR_GIT_COMMIT_LIMIT, commits: [] });
+
+  try {
+    const commits = listCommits(row!.dirpath, DEFAULT_DIR_GIT_COMMIT_LIMIT);
+    return c.json({ limit: DEFAULT_DIR_GIT_COMMIT_LIMIT, commits });
+  } catch (e: any) {
+    return c.text('Failed to read git commits', 500);
+  }
+});
+
+// API: commit diff for a recent commit in a shared git repository directory
+dirRoutes.get('/d/:token/api/git/commit/:sha', (c) => {
+  const { row, expiredHtml } = getDirAuth(c);
+  if (!row && !expiredHtml) return c.text('Not found', 404);
+  if (expiredHtml) return c.text('Expired', 403);
+  if (!isGitRepo(row!.dirpath)) return c.text('Not found', 404);
+
+  const sha = c.req.param('sha');
+  if (!isShaLike(sha)) return c.text('Not found', 404);
+  if (!isCommitInRecentWindow(row!.dirpath, sha, DEFAULT_DIR_GIT_COMMIT_LIMIT)) {
+    return c.text('Commit is outside the shared recent history window', 403);
+  }
+
+  try {
+    return c.json(renderCommitDiffHtml(row!.dirpath, sha));
+  } catch (e: any) {
+    return c.text('Failed to read git commit', 500);
+  }
 });
 
 // API: file preview

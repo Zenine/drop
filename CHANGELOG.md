@@ -8,6 +8,7 @@
 
 ### 新增
 
+- Git 仓库目录分享页面新增 `Commits` 标签页，默认只展示最近 5 条 commit，并且只允许查看这 5 条 commit 的 diff。
 - 安装脚本现在会强制创建或更新 `drop-preview` 别名，作为 `drop` 的无歧义入口，便于 AI agent 避免和 Git 丢弃改动语义混淆。
 - 新增 `bun run build:release` / `scripts/build-release.ts`，用于一次性构建 `install.sh` 期望的四个平台 release assets，并自动生成 Darwin 平台的 `drop-darwin-*` 文件名。
 - `scripts/build.ts` 新增 `--skip-web`，发布构建会复用一次前端构建产物，避免为每个平台重复执行 `vite build`。
@@ -32,6 +33,7 @@
 
 ### 测试
 
+- 新增目录 Git API 测试，覆盖 Git 仓库识别、最近 5 条 commit 限制、旧 SHA 拒绝、邮箱不暴露和 diff HTML 转义。
 - 新增发布构建脚本 dry-run 测试，覆盖四个平台 release assets 名称和构建步骤。
 - 新增打包回归测试，防止代码渲染器重新引入运行时 `highlight.js/package.json` 依赖。
 - 新增 QR 输出测试，覆盖 stderr/stdout 分离、JSON 可解析性和失败降级。
@@ -41,6 +43,7 @@
 
 ### 文档
 
+- 更新目录分享文档，说明 Git 仓库目录的 `Commits` 标签页、最近 5 条限制和历史内容敏感性。
 - AI Agent 指令块改为优先使用 `drop-preview`，并说明它是 `drop` 的别名，不应理解为 Git discard/drop changes。
 - 更新 `README.md` 和 `README.zh-CN.md`，补充 QR、密钥扫描、自定义 slug、访问统计、安全边界和使用示例。
 - 补充 Cloudflare Tunnel named tunnel 的 `127.0.0.1:17173` 配置建议和本地/公网冒烟测试步骤。

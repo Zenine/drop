@@ -15,3 +15,28 @@ export interface FilePreviewData {
   size?: number;
   mtime?: number;
 }
+
+export interface GitInfoResponse {
+  is_git_repo: boolean;
+  default_limit: number;
+  commits_url: string | null;
+}
+
+export interface GitCommitSummary {
+  sha: string;
+  short_sha: string;
+  subject: string;
+  author_name: string;
+  authored_at: string;
+}
+
+export interface GitCommitsResponse {
+  limit: number;
+  commits: GitCommitSummary[];
+}
+
+export interface GitCommitDiffResponse {
+  commit: GitCommitSummary;
+  diff_html: string;
+  file_count: number;
+}
