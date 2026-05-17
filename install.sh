@@ -43,9 +43,11 @@ mkdir -p "$INSTALL_DIR"
 echo "Downloading ${BINARY}..."
 curl -fsSL "$DOWNLOAD_URL" -o "${INSTALL_DIR}/drop"
 chmod +x "${INSTALL_DIR}/drop"
+ln -sf "${INSTALL_DIR}/drop" "${INSTALL_DIR}/drop-preview"
 
 echo ""
 echo "Installed drop to ${INSTALL_DIR}/drop"
+echo "Installed drop-preview alias to ${INSTALL_DIR}/drop-preview"
 
 # Check if in PATH
 if ! echo "$PATH" | tr ':' '\n' | grep -qx "$INSTALL_DIR"; then
@@ -57,5 +59,6 @@ fi
 echo ""
 echo "Get started:"
 echo "  drop ~/file.py              # share a file"
+echo "  drop-preview ~/file.py      # same command, clearer for AI agents"
 echo "  drop ~/project/             # share a directory"
 echo "  drop list                   # list active shares"

@@ -8,6 +8,7 @@
 
 ### 新增
 
+- 安装脚本现在会强制创建或更新 `drop-preview` 别名，作为 `drop` 的无歧义入口，便于 AI agent 避免和 Git 丢弃改动语义混淆。
 - 新增 `bun run build:release` / `scripts/build-release.ts`，用于一次性构建 `install.sh` 期望的四个平台 release assets，并自动生成 Darwin 平台的 `drop-darwin-*` 文件名。
 - `scripts/build.ts` 新增 `--skip-web`，发布构建会复用一次前端构建产物，避免为每个平台重复执行 `vite build`。
 - 新增终端二维码输出：分享命令和 `drop owner-url` 支持 `--qr`，二维码写入 stderr，stdout 仍保持纯 URL 或可解析 JSON。
@@ -40,6 +41,7 @@
 
 ### 文档
 
+- AI Agent 指令块改为优先使用 `drop-preview`，并说明它是 `drop` 的别名，不应理解为 Git discard/drop changes。
 - 更新 `README.md` 和 `README.zh-CN.md`，补充 QR、密钥扫描、自定义 slug、访问统计、安全边界和使用示例。
 - 补充 Cloudflare Tunnel named tunnel 的 `127.0.0.1:17173` 配置建议和本地/公网冒烟测试步骤。
 - 明确 `drop serve --tunnel` 目前只是未来内置隧道支持的预留选项，现阶段需要手动运行外部 tunnel 并设置 `base_url`。
