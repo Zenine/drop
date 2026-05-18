@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { app } from '../src/server/index.js';
-import { closeDb } from '../src/db/index.js';
+import { closeDb, getDb } from '../src/db/index.js';
 import { addDirAuthorization } from '../src/db/dir-authorizations.js';
+import { getOwnerKey, saveConfig } from '../src/shared/config.js';
+import { CONFIG_PATH } from '../src/shared/constants.js';
+
+let oldConfig: string | null = null;
 
 function withTempDb(): string {
   closeDb();
+  if (oldConfig === null) oldConfig = existsSync(CONFIG_PATH) ? readFileSync(CONFIG_PATH, 'utf-8') : '';
   const root = mkdtempSync(join(tmpdir(), 'drop-dir-git-api-'));
   process.env.DROP_DB = join(root, 'drop.db');
   return root;
@@ -45,9 +50,37 @@ function createRepoWithCommits(root: string, count: number): { repo: string; sha
   return { repo, shas };
 }
 
+async function unlockGitHistory(
+  token: string,
+  ownerKey = getOwnerKey(),
+  init: RequestInit = {},
+  urlPrefix = '',
+): Promise<Response> {
+  return app.request(`${urlPrefix}/d/${token}/api/git/unlock`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+    body: JSON.stringify({ owner_key: ownerKey }),
+    ...init,
+  });
+}
+
+function cookieHeader(response: Response): string {
+  const setCookie = response.headers.get('set-cookie') || '';
+  return setCookie.split(';')[0];
+}
+
 afterEach(() => {
   closeDb();
   delete process.env.DROP_DB;
+  if (oldConfig !== null) {
+    if (oldConfig === '') {
+      saveConfig({});
+      rmSync(CONFIG_PATH, { force: true });
+    } else {
+      saveConfig(JSON.parse(oldConfig));
+    }
+    oldConfig = null;
+  }
 });
 
 describe('directory git API', () => {
@@ -121,6 +154,166 @@ describe('directory git API', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test('owner can unlock the current git share to one hundred commits with a scoped signed cookie', async () => {
+    const root = withTempDb();
+    try {
+      const { repo, shas } = createRepoWithCommits(root, 101);
+      const token = addDirAuthorization(repo, 60, []).token;
+
+      const locked = await app.request(`/d/${token}/api/git/commits`);
+      const lockedJson = await locked.json() as any;
+      expect(locked.status).toBe(200);
+      expect(lockedJson.limit).toBe(5);
+      expect(lockedJson.commits).toHaveLength(5);
+
+      const unlock = await unlockGitHistory(token);
+      const unlockJson = await unlock.json() as any;
+      expect(unlock.status).toBe(200);
+      expect(unlock.headers.get('cache-control')).toBe('no-store');
+      const setCookie = unlock.headers.get('set-cookie') || '';
+      expect(setCookie).toContain('drop_dir_git_history=');
+      expect(setCookie).toContain('HttpOnly');
+      expect(setCookie).toContain('SameSite=Lax');
+      expect(unlockJson).toEqual(expect.objectContaining({
+        unlocked: true,
+        limit: 100,
+      }));
+      expect(JSON.stringify(unlockJson)).not.toContain(getOwnerKey());
+      expect(JSON.stringify(unlockJson)).not.toContain(token);
+      const cookie = cookieHeader(unlock);
+
+      const expanded = await app.request(`/d/${token}/api/git/commits`, {
+        headers: { Cookie: cookie },
+      });
+      const expandedJson = await expanded.json() as any;
+      expect(expanded.status).toBe(200);
+      expect(expandedJson.limit).toBe(100);
+      expect(expandedJson.unlocked).toBe(true);
+      expect(expandedJson.commits).toHaveLength(100);
+      expect(expandedJson.commits.map((c: any) => c.sha)).toEqual(shas.slice(0, 100));
+      expect(JSON.stringify(expandedJson)).not.toContain('test@example.com');
+
+      const hundredth = await app.request(`/d/${token}/api/git/commit/${shas[99]}`, {
+        headers: { Cookie: cookie },
+      });
+      expect(hundredth.status).toBe(200);
+
+      const hundredFirst = await app.request(`/d/${token}/api/git/commit/${shas[100]}`, {
+        headers: { Cookie: cookie },
+      });
+      expect(hundredFirst.status).toBe(403);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 20000);
+
+  test('unlock endpoint rejects query keys, cross-site requests, and forged cookies without leaking secrets', async () => {
+    const root = withTempDb();
+    try {
+      const { repo } = createRepoWithCommits(root, 6);
+      const token = addDirAuthorization(repo, 60, []).token;
+      const ownerKey = getOwnerKey();
+
+      const queryKey = await app.request(`/d/${token}/api/git/unlock?key=${encodeURIComponent(ownerKey)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const queryOwnerKey = await app.request(`/d/${token}/api/git/unlock?owner_key=${encodeURIComponent(ownerKey)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      expect(queryKey.status).toBe(403);
+      expect(queryOwnerKey.status).toBe(403);
+      expect(queryKey.headers.get('set-cookie')).toBeNull();
+      expect(queryOwnerKey.headers.get('set-cookie')).toBeNull();
+
+      saveConfig({ owner_key: ownerKey, base_url: 'https://drop.example' });
+      const sameOriginTunnel = await unlockGitHistory(token, ownerKey, {
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://drop.example',
+          'Sec-Fetch-Site': 'same-origin',
+          'X-Forwarded-Proto': 'https',
+          'X-Forwarded-Host': 'drop.example',
+        },
+      }, 'http://127.0.0.1:17173');
+      expect(sameOriginTunnel.status).toBe(200);
+      expect(sameOriginTunnel.headers.get('set-cookie')).toContain('drop_dir_git_history=');
+
+      const crossSite = await unlockGitHistory(token, ownerKey, {
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://evil.example',
+          'Sec-Fetch-Site': 'cross-site',
+        },
+      }, 'https://drop.example');
+      const crossSiteText = await crossSite.text();
+      expect(crossSite.status).toBe(403);
+      expect(crossSite.headers.get('set-cookie')).toBeNull();
+
+      const forged = await app.request(`/d/${token}/api/git/commits`, {
+        headers: { Cookie: 'drop_dir_git_history=forged' },
+      });
+      const forgedJson = await forged.json() as any;
+      expect(forged.status).toBe(200);
+      expect(forgedJson.limit).toBe(5);
+      expect(forgedJson.commits).toHaveLength(5);
+
+      const wrongKey = await unlockGitHistory(token, `${ownerKey}-wrong`);
+      const wrongKeyText = await wrongKey.text();
+      expect(wrongKey.status).toBe(403);
+      expect(wrongKey.headers.get('set-cookie')).toBeNull();
+      for (const text of [crossSiteText, wrongKeyText]) {
+        expect(text).not.toContain(ownerKey);
+        expect(text).not.toContain(repo);
+        expect(text.toLowerCase()).not.toContain('fatal:');
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('unlock cookie is secure on https and cannot be reused across shares or after share expiry', async () => {
+    const root = withTempDb();
+    try {
+      const first = createRepoWithCommits(root, 101);
+      const secondRoot = join(root, 'second');
+      mkdirSync(secondRoot);
+      const second = createRepoWithCommits(secondRoot, 6);
+      const firstToken = addDirAuthorization(first.repo, 60, []).token;
+      const secondToken = addDirAuthorization(second.repo, 60, []).token;
+
+      const unlock = await unlockGitHistory(firstToken, getOwnerKey(), {}, 'https://drop.example');
+      expect(unlock.status).toBe(200);
+      const setCookie = unlock.headers.get('set-cookie') || '';
+      expect(setCookie).toContain('Secure');
+      const cookie = cookieHeader(unlock);
+
+      const firstExpanded = await app.request(`/d/${firstToken}/api/git/commits`, {
+        headers: { Cookie: cookie },
+      });
+      expect((await firstExpanded.json() as any).limit).toBe(100);
+
+      const secondLocked = await app.request(`/d/${secondToken}/api/git/commits`, {
+        headers: { Cookie: cookie },
+      });
+      const secondLockedJson = await secondLocked.json() as any;
+      expect(secondLocked.status).toBe(200);
+      expect(secondLockedJson.limit).toBe(5);
+      expect(secondLockedJson.commits).toHaveLength(5);
+
+      getDb().query('UPDATE dir_authorizations SET expires_at = ? WHERE token = ?').run(Date.now() / 1000 - 1, firstToken);
+      const expired = await app.request(`/d/${firstToken}/api/git/commits`, {
+        headers: { Cookie: cookie },
+      });
+      expect(expired.status).toBe(403);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30000);
 
   test('allows diffs for the latest five commits and rejects older or invalid shas', async () => {
     const root = withTempDb();

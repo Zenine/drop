@@ -60,13 +60,14 @@ drop-preview ~/github/writing-craft --slug writing-craft-project
 
 ### 第二阶段：Owner 解锁更多历史
 
-暂不在 MVP 中实现。第一阶段稳定后再评估。
+已完成并通过完整验证；已同步保留在 `CHANGELOG.md`：
 
-- [ ] Owner 解锁查看更多 commit 历史。
-- [ ] 解锁后显示最近 100 条 commit。
-- [ ] 解锁后允许查看最近 100 条内的 diff。
-- [ ] 复用现有 owner key / owner auth，避免新增明文密码。
-- [ ] signed cookie 绑定 share token、权限范围和过期时间。
-- [ ] 解锁后可显示更完整 metadata，但仍需谨慎处理邮箱等隐私字段。
-- [ ] 增加对应鉴权、cookie 伪造、过期和跨 token 访问测试。
+- [x] Owner 解锁查看更多 commit 历史。
+- [x] 解锁后显示最近 100 条 commit。
+- [x] 解锁后允许查看最近 100 条内的 diff。
+- [x] 复用现有 owner key / owner auth，避免新增明文密码。
+- [x] signed cookie 绑定 share token、权限范围和过期时间。
+- [x] 解锁后不扩展敏感 metadata，继续隐藏 author email。
+- [x] 增加对应鉴权、cookie 伪造、过期和跨 token 访问测试。
+- [x] 前端 modal 避免 owner key 进入 URL、storage 或 console，并在取消、失败、Escape、切换分享时清空。
 

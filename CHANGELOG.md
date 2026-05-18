@@ -8,6 +8,7 @@
 
 ### 新增
 
+- Git 仓库目录分享页面新增 Owner unlock，可在当前分享范围内用 owner key 临时解锁到最近 100 条 commit，解锁随分享过期失效。
 - Git 仓库目录分享页面新增 `Commits` 标签页，默认只展示最近 5 条 commit，并且只允许查看这 5 条 commit 的 diff。
 - 安装脚本现在会强制创建或更新 `drop-preview` 别名，作为 `drop` 的无歧义入口，便于 AI agent 避免和 Git 丢弃改动语义混淆。
 - 新增 `bun run build:release` / `scripts/build-release.ts`，用于一次性构建 `install.sh` 期望的四个平台 release assets，并自动生成 Darwin 平台的 `drop-darwin-*` 文件名。
@@ -26,6 +27,7 @@
 
 ### 安全
 
+- Git 历史 Owner unlock 使用独立 signed cookie 绑定当前分享 token、权限范围、窗口大小和过期时间；owner key 只通过同源 POST 提交，不进入 URL，并拒绝 query key、跨站请求、伪造 cookie 和跨分享复用。
 - 分享前密钥扫描可阻止误分享私钥、API key、service account JSON 和敏感凭证文件名。
 - 访问日志不保存原始 IP、完整 User-Agent、完整 Referer、完整目录路径、query、cookies 或 owner key；客户端身份和目录目标路径使用 HMAC 哈希保存。
 - 自定义 slug 保持 token URL 优先，拒绝与现有 token 冲突的 slug，减少 slug 遮蔽 token URL 的风险。
@@ -33,6 +35,7 @@
 
 ### 测试
 
+- 扩展目录 Git API 测试，覆盖 Owner unlock、最近 100 条窗口、第 101 条拒绝、query key 拒绝、跨站请求拒绝、伪造 cookie、跨分享复用失败和分享过期失效。
 - 新增目录 Git API 测试，覆盖 Git 仓库识别、最近 5 条 commit 限制、旧 SHA 拒绝、邮箱不暴露和 diff HTML 转义。
 - 新增发布构建脚本 dry-run 测试，覆盖四个平台 release assets 名称和构建步骤。
 - 新增打包回归测试，防止代码渲染器重新引入运行时 `highlight.js/package.json` 依赖。
@@ -43,6 +46,7 @@
 
 ### 文档
 
+- 更新目录分享文档，说明 Owner unlock 的当前分享范围、最近 100 条窗口、分享过期失效和 owner key 不应分享给访客。
 - 更新目录分享文档，说明 Git 仓库目录的 `Commits` 标签页、最近 5 条限制和历史内容敏感性。
 - AI Agent 指令块改为优先使用 `drop-preview`，并说明它是 `drop` 的别名，不应理解为 Git discard/drop changes。
 - 更新 `README.md` 和 `README.zh-CN.md`，补充 QR、密钥扫描、自定义 slug、访问统计、安全边界和使用示例。

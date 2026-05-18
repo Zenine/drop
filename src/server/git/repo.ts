@@ -3,6 +3,7 @@ import { htmlEscape } from '../../shared/utils.js';
 import { highlightCode } from '../render/code.js';
 
 export const DEFAULT_DIR_GIT_COMMIT_LIMIT = 5;
+export const OWNER_DIR_GIT_COMMIT_LIMIT = 100;
 
 export interface DirGitCommitSummary {
   sha: string;
@@ -32,9 +33,14 @@ export function isShaLike(sha: string): boolean {
   return /^[0-9a-f]{7,40}$/i.test(sha);
 }
 
+export function normalizeDirGitCommitLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return DEFAULT_DIR_GIT_COMMIT_LIMIT;
+  return Math.max(0, Math.min(Math.floor(limit), OWNER_DIR_GIT_COMMIT_LIMIT));
+}
+
 export function listCommits(repoPath: string, limit = DEFAULT_DIR_GIT_COMMIT_LIMIT): DirGitCommitSummary[] {
   if (!isGitRepo(repoPath)) return [];
-  const safeLimit = Math.max(0, Math.min(limit, DEFAULT_DIR_GIT_COMMIT_LIMIT));
+  const safeLimit = normalizeDirGitCommitLimit(limit);
   if (safeLimit === 0) return [];
 
   const result = Bun.spawnSync([
