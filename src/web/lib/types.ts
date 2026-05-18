@@ -33,6 +33,13 @@ export interface GitCommitSummary {
 export interface GitCommitsResponse {
   limit: number;
   commits: GitCommitSummary[];
+  unlocked?: boolean;
+}
+
+export interface GitUnlockResponse {
+  unlocked: boolean;
+  limit: number;
+  expires_at: number;
 }
 
 export interface GitCommitDiffResponse {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { GitCommitDiffResponse, GitCommitSummary } from '../lib/types';
-  import { fetchGitCommitDiff, fetchGitCommits } from '../lib/api';
+  import { fetchGitCommitDiff, fetchGitCommits, unlockGitHistory } from '../lib/api';
   import { fade } from 'svelte/transition';
 
   interface Props {
@@ -18,6 +18,19 @@
   let error = $state('');
   let diffError = $state('');
   let iframeEl: HTMLIFrameElement | undefined = $state();
+  let unlockButtonEl: HTMLButtonElement | undefined = $state();
+  let ownerKeyInputEl: HTMLInputElement | undefined = $state();
+  let commitListHeaderEl: HTMLElement | undefined = $state();
+  let loadCommitsRequestId = 0;
+  let unlockRequestId = 0;
+  let previousToken = '';
+  let previousBasePath = '';
+  let showUnlockModal = $state(false);
+  let ownerKey = $state('');
+  let unlocking = $state(false);
+  let unlockError = $state('');
+  let unlocked = $state(false);
+  let currentLimit = $state(5);
 
   function formatDate(value: string): string {
     if (!value) return '';
@@ -32,22 +45,129 @@
     });
   }
 
-  function loadCommits() {
+  function resetCommitState() {
+    commits = [];
+    selectedSha = '';
+    diff = null;
+    diffError = '';
+    loadingDiff = false;
+    error = '';
+    unlocked = false;
+    currentLimit = 5;
+    showUnlockModal = false;
+    ownerKey = '';
+    unlockError = '';
+    unlocking = false;
+    unlockRequestId += 1;
+  }
+
+  async function loadCommits() {
+    const requestId = ++loadCommitsRequestId;
     loadingCommits = true;
     error = '';
 
-    fetchGitCommits(token, basePath)
-      .then((data) => {
-        commits = data.commits;
-        loadingCommits = false;
-        if (commits.length > 0 && !selectedSha) {
+    try {
+      const data = await fetchGitCommits(token, basePath);
+      if (requestId !== loadCommitsRequestId) return;
+
+      commits = data.commits;
+      currentLimit = data.limit;
+      unlocked = Boolean(data.unlocked);
+      loadingCommits = false;
+
+      const stillSelected = selectedSha && commits.some((commit) => commit.sha === selectedSha);
+      if (!stillSelected) {
+        selectedSha = '';
+        diff = null;
+        diffError = '';
+        if (commits.length > 0) {
           void selectCommit(commits[0].sha);
         }
-      })
-      .catch(() => {
-        loadingCommits = false;
-        error = 'Failed to load commit history';
-      });
+      }
+    } catch {
+      if (requestId !== loadCommitsRequestId) return;
+      loadingCommits = false;
+      error = 'Failed to load commit history';
+    }
+  }
+
+  function openUnlockModal() {
+    unlockError = '';
+    ownerKey = '';
+    showUnlockModal = true;
+    queueMicrotask(() => ownerKeyInputEl?.focus());
+  }
+
+  function closeUnlockModal() {
+    ownerKey = '';
+    unlockError = '';
+    showUnlockModal = false;
+    queueMicrotask(() => unlockButtonEl?.focus());
+  }
+
+  function handleOverlayClick(event: MouseEvent) {
+    if (event.target === event.currentTarget) {
+      closeUnlockModal();
+    }
+  }
+
+  function handleWindowKeydown(event: KeyboardEvent) {
+    if (!showUnlockModal) return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeUnlockModal();
+      return;
+    }
+
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '.unlock-modal button:not([disabled]), .unlock-modal input:not([disabled])',
+      ),
+    );
+    if (!focusable.length) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  async function submitUnlock() {
+    if (unlocking) return;
+
+    const submittedOwnerKey = ownerKey;
+    const submittedToken = token;
+    const submittedBasePath = basePath;
+    const requestId = ++unlockRequestId;
+    ownerKey = '';
+    unlockError = '';
+    unlocking = true;
+
+    try {
+      const result = await unlockGitHistory(submittedToken, submittedBasePath, submittedOwnerKey);
+      if (requestId !== unlockRequestId || submittedToken !== token || submittedBasePath !== basePath) return;
+
+      unlocked = Boolean(result.unlocked);
+      currentLimit = result.limit;
+      showUnlockModal = false;
+      await loadCommits();
+      queueMicrotask(() => commitListHeaderEl?.focus());
+    } catch {
+      if (requestId !== unlockRequestId || submittedToken !== token || submittedBasePath !== basePath) return;
+      unlockError = 'Could not unlock more history. Please try again.';
+    } finally {
+      if (requestId === unlockRequestId && submittedToken === token && submittedBasePath === basePath) {
+        ownerKey = '';
+        unlocking = false;
+      }
+    }
   }
 
   async function selectCommit(sha: string) {
@@ -96,7 +216,12 @@
   }
 
   $effect(() => {
-    loadCommits();
+    if (token !== previousToken || basePath !== previousBasePath) {
+      previousToken = token;
+      previousBasePath = basePath;
+      resetCommitState();
+    }
+    void loadCommits();
   });
 
   $effect(() => {
@@ -109,9 +234,20 @@
 
 <div class="commits-tab" in:fade={{ duration: 120 }}>
   <aside class="commit-list" aria-label="Recent commits">
-    <div class="commit-list-header">
+    <div class="commit-list-header" bind:this={commitListHeaderEl} tabindex="-1">
       <div class="commit-list-title">Recent commits</div>
-      <div class="commit-list-note">Showing the latest 5 commits. Owner unlock for deeper history is planned.</div>
+      {#if unlocked}
+        <div class="commit-list-note success">
+          More history is unlocked for this share until the share expires. Showing up to {currentLimit} commits.
+        </div>
+      {:else}
+        <div class="commit-list-note">
+          Showing the latest {currentLimit || 5} commits. Owner can temporarily unlock more history.
+        </div>
+        <button class="unlock-button" type="button" bind:this={unlockButtonEl} onclick={openUnlockModal}>
+          Owner unlock
+        </button>
+      {/if}
     </div>
 
     {#if loadingCommits}
@@ -154,6 +290,66 @@
   </section>
 </div>
 
+<svelte:window onkeydown={handleWindowKeydown} />
+
+{#if showUnlockModal}
+  <div
+    class="modal-backdrop"
+    role="presentation"
+    onclick={handleOverlayClick}
+  >
+    <div
+      class="unlock-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="unlock-modal-title"
+      aria-describedby="unlock-modal-description"
+      tabindex="-1"
+    >
+      <form onsubmit={(event) => { event.preventDefault(); void submitUnlock(); }}>
+        <div class="modal-header">
+          <div>
+            <h2 id="unlock-modal-title">Unlock owner history</h2>
+            <p id="unlock-modal-description">Enter the owner key to temporarily show more commits for this share.</p>
+          </div>
+          <button
+            class="icon-button"
+            type="button"
+            aria-label="Close unlock modal"
+            onclick={closeUnlockModal}
+          >
+            ×
+          </button>
+        </div>
+
+        <label class="owner-key-label" for="owner-key-input">Owner key</label>
+        <input
+          id="owner-key-input"
+          class="owner-key-input"
+          type="password"
+          autocomplete="off"
+          bind:this={ownerKeyInputEl}
+          bind:value={ownerKey}
+          disabled={unlocking}
+        />
+
+        {#if unlockError}
+          <div class="unlock-error" role="alert">{unlockError}</div>
+        {/if}
+
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" onclick={closeUnlockModal}>
+            Cancel
+          </button>
+          <button class="primary-button" type="submit" disabled={unlocking || ownerKey.length === 0}>
+            {unlocking ? 'Unlocking…' : 'Unlock'}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+{/if}
+
 <style>
   .commits-tab {
     flex: 1;
@@ -190,6 +386,26 @@
     color: var(--text-dim);
     font-size: 11px;
     line-height: 1.4;
+  }
+
+  .commit-list-note.success {
+    color: var(--accent);
+  }
+
+  .unlock-button {
+    margin-top: 10px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .unlock-button:hover {
+    background: var(--bg-hover);
   }
 
   .commit-items {
@@ -262,7 +478,136 @@
     color: #cf222e;
   }
 
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.54);
+  }
+
+  .unlock-modal {
+    width: min(420px, 100%);
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--bg);
+    color: var(--text);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  }
+
+  .unlock-modal form {
+    padding: 18px;
+  }
+
+  .modal-header {
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .modal-header p {
+    margin: 6px 0 0;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .icon-button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .icon-button:disabled,
+  .secondary-button:disabled,
+  .primary-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .owner-key-label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .owner-key-input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--bg-sidebar);
+    color: var(--text);
+    padding: 10px 12px;
+    font: inherit;
+  }
+
+  .owner-key-input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .unlock-error {
+    margin-top: 10px;
+    color: #cf222e;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .secondary-button,
+  .primary-button {
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .secondary-button {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+  }
+
+  .primary-button {
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
+
   @media (max-width: 768px) {
+    .modal-backdrop {
+      align-items: flex-start;
+      padding: 12px;
+      overflow-y: auto;
+    }
+
     .commits-tab {
       flex-direction: column;
     }
