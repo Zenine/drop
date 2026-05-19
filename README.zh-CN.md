@@ -249,6 +249,7 @@ drop ~/file.py --slug demo-file    # 生成可读的 /f/demo-file URL
 drop ~/project/                    # 分享可浏览文件树
 drop ~/project/ --ttl 7200         # 自定义 TTL
 drop ~/project/ --exclude '*.log'  # 添加排除规则
+drop ~/project/ --include-hidden   # 包含 dotfile 和隐藏目录
 drop ~/project/ --live             # 目录变化时刷新
 drop ~/project/ --qr               # 同时把终端二维码输出到 stderr
 drop ~/project/ --force            # 扫描密钥；即使命中也继续分享
@@ -256,7 +257,7 @@ drop ~/project/ --no-secret-scan   # 跳过分享前密钥扫描
 drop ~/project/ --slug demo-dir    # 生成可读的 /d/demo-dir URL
 ```
 
-默认排除项：`.git/`、`__pycache__/`、`.env`、`node_modules/`、`.DS_Store`、`*.pyc`、`.venv/`。
+默认排除项：所有 dotfile 和隐藏目录，例如 `.env`、`.github/`、`.idea/`、`.nebula-secrets/`，以及 `__pycache__/`、`node_modules/`、`*.pyc`、`.venv/`。只有明确需要分享隐藏文件时才使用 `--include-hidden`；已配置的 `default_excludes` 和显式 `--exclude` 仍然生效。
 
 当分享目录本身是 Git 仓库时，目录浏览页面会额外显示 `Commits` 标签页。该标签页默认只展示最近 5 条 commit，并且只有这 5 条 commit 的 diff 可以从目录分享中打开。Owner 可以在页面内使用 `Owner unlock` 为当前分享临时解锁到最近 100 条 commit，解锁只持续到该分享过期；owner key 通过 POST 提交，不应分享给访客。这样既保持“查看当前项目文件”为主体验，也减少误暴露更早历史的风险。请把 commit 历史视为敏感内容：其中可能包含已删除文件、历史凭证或私有元数据。
 
@@ -280,7 +281,7 @@ drop share --content "hello" --slug hello-note
 
 覆盖规则包括私钥、GitHub token、OpenAI/Anthropic API key、Slack token、Stripe live key、Google API key、AWS access key ID、Google service-account JSON，以及 `credentials.json`、`secrets.yaml`、`*.pem`、`*.key`、`.npmrc`、`.netrc` 等敏感文件名。
 
-目录扫描使用与目录分享相同的默认排除项，并叠加 `--exclude`；不会跟随逃出分享目录的 symlink，也会避免 symlink cycle。
+目录扫描使用与目录分享相同的默认排除项，并叠加 `--exclude`；不会跟随逃出分享目录的 symlink，也会避免 symlink cycle。对目录分享而言，`--include-hidden` 会同时移除文件树和分享前扫描中的内置 dotfile/隐藏目录排除项，因此隐藏文件里的密钥会被扫描并可能阻断分享，除非再用显式 `--exclude` 排除。
 
 覆盖开关：
 

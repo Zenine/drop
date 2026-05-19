@@ -249,6 +249,7 @@ drop ~/file.py --slug demo-file    # readable /f/demo-file URL
 drop ~/project/                    # share a browsable file tree
 drop ~/project/ --ttl 7200         # custom TTL
 drop ~/project/ --exclude '*.log'  # add exclude patterns
+drop ~/project/ --include-hidden   # include dotfiles and hidden directories
 drop ~/project/ --live             # refresh when the directory changes
 drop ~/project/ --qr               # also print a terminal QR code to stderr
 drop ~/project/ --force            # scan secrets, then share even if findings exist
@@ -256,7 +257,7 @@ drop ~/project/ --no-secret-scan   # skip the pre-share secret scan
 drop ~/project/ --slug demo-dir    # readable /d/demo-dir URL
 ```
 
-Default excludes: `.git/`, `__pycache__/`, `.env`, `node_modules/`, `.DS_Store`, `*.pyc`, `.venv/`.
+Default excludes: dotfiles and hidden directories such as `.env`, `.github/`, `.idea/`, and `.nebula-secrets/`, plus `__pycache__/`, `node_modules/`, `*.pyc`, and `.venv/`. Use `--include-hidden` only when you intentionally want hidden files included; configured `default_excludes` and explicit `--exclude` patterns still apply.
 
 When the shared directory is a Git repository, the directory browser also shows a `Commits` tab. It is intentionally limited to the latest 5 commits by default, and only those 5 commits can be opened as diffs from the directory share. The owner can use the in-page `Owner unlock` action to unlock the current share to the latest 100 commits until the share expires; the owner key is submitted by POST and should never be shared with visitors. This keeps the primary experience focused on the current project files while reducing accidental exposure of older history. Treat commit history as sensitive: it may include deleted files, old credentials, or private metadata.
 
@@ -280,7 +281,7 @@ Before creating a file, directory, stdin, or Git commit authorization, `drop` sc
 
 Covered rules include private keys, GitHub tokens, OpenAI/Anthropic API keys, Slack tokens, Stripe live keys, Google API keys, AWS access key IDs, Google service-account JSON, and sensitive filenames such as `credentials.json`, `secrets.yaml`, `*.pem`, `*.key`, `.npmrc`, and `.netrc`.
 
-Directory scans use the same default excludes as directory sharing plus any `--exclude` patterns, and do not follow symlinks that escape the shared directory or create cycles.
+Directory scans use the same default excludes as directory sharing plus any `--exclude` patterns, and do not follow symlinks that escape the shared directory or create cycles. For directory shares, `--include-hidden` removes the built-in dotfile/hidden-directory exclude from both the file tree and the pre-share scan, so hidden secrets are scanned and can block the share unless explicitly excluded.
 
 Override flags:
 

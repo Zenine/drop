@@ -196,20 +196,119 @@
 
     const style = iframeDoc.createElement('style');
     style.textContent = `
-      body { margin: 0; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #ffffff;
+        color: #1f2328;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
       .commit-header { margin-bottom: 14px; }
-      .commit-subject { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
-      .commit-body { white-space: pre-wrap; color: #6b7280; }
-      .commit-meta, .file-summary, .file-stats { color: #6b7280; font-size: 12px; }
-      .hash, .file-path { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-      details { border: 1px solid #d0d7de; border-radius: 8px; margin: 12px 0; overflow: hidden; }
-      summary { cursor: pointer; padding: 10px 12px; background: #f6f8fa; }
-      pre { margin: 0; padding: 12px; overflow: auto; font-size: 12px; line-height: 1.45; }
+      .commit-subject {
+        color: #1f2328;
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+      .commit-body { white-space: pre-wrap; color: #57606a; }
+      .commit-meta, .file-summary, .file-stats {
+        color: #57606a;
+        font-size: 12px;
+      }
+      .hash {
+        color: #0969da;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      .file-path {
+        color: #1f2328;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-weight: 700;
+      }
+      details {
+        border: 1px solid #c8d1dc;
+        border-radius: 8px;
+        margin: 12px 0;
+        overflow: hidden;
+        background: #ffffff;
+      }
+      summary {
+        cursor: pointer;
+        padding: 10px 12px;
+        background: #f1f6fd;
+        color: #1f2328;
+      }
+      pre {
+        margin: 0;
+        padding: 12px;
+        overflow: auto;
+        background: #ffffff;
+        color: #24292f;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .hljs {
+        background: #ffffff !important;
+        color: #24292f;
+      }
+      .hljs-addition,
+      .hljs-deletion,
+      .hljs-meta {
+        display: block;
+        margin: 0 -12px;
+        padding: 0 12px;
+      }
+      .hljs-addition {
+        background: #dafbe1;
+        color: #116329;
+      }
+      .hljs-deletion {
+        background: #ffebe9;
+        color: #82071e;
+      }
+      .hljs-meta {
+        background: #f6f8fa;
+        color: #8250df;
+        font-weight: 700;
+      }
+      .hljs-comment {
+        color: #57606a;
+      }
       @media (prefers-color-scheme: dark) {
-        body { background: #1e1e1e; color: #d4d4d4; }
-        .commit-meta, .file-summary, .file-stats, .commit-body { color: #9ca3af; }
-        details { border-color: #3f3f46; }
-        summary { background: #252526; }
+        body { background: #1e1e1e; color: #e5e7eb; }
+        .commit-subject, .file-path { color: #f3f4f6; }
+        .hash { color: #79c0ff; }
+        .commit-meta, .file-summary, .file-stats, .commit-body { color: #cbd5e1; }
+        details {
+          border-color: #4b5563;
+          background: #111827;
+        }
+        summary {
+          background: #1f2937;
+          color: #f3f4f6;
+        }
+        pre {
+          background: #0f172a;
+          color: #e5e7eb;
+        }
+        .hljs {
+          background: #0f172a !important;
+          color: #e5e7eb;
+        }
+        .hljs-addition {
+          background: #0f5132;
+          color: #aff5b4;
+        }
+        .hljs-deletion {
+          background: #67060c;
+          color: #ffdcd7;
+        }
+        .hljs-meta {
+          background: #111827;
+          color: #d8b4fe;
+        }
+        .hljs-comment {
+          color: #94a3b8;
+        }
       }
     `;
     iframeDoc.head.appendChild(style);
