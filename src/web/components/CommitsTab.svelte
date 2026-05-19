@@ -441,6 +441,7 @@
   .commit-subject-line {
     font-size: 13px;
     font-weight: 600;
+    color: var(--text-header);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -450,7 +451,7 @@
   .commit-date {
     display: flex;
     gap: 8px;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-size: 11px;
   }
 
