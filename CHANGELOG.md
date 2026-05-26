@@ -4,7 +4,7 @@
 
 ## Unreleased
 
-验证：2026-05-19 在本机运行 `scripts/verify.sh` 通过，包含 `tsc --noEmit`、`bun test`（78 pass / 0 fail，361 expect() calls）和 `bun run scripts/build.ts`；并完成本地二进制、线上 `template` / `writing-craft` 页面截图验证、slug、密钥扫描、QR 输出和访问统计冒烟测试。
+验证：2026-05-26 在本机运行 `scripts/verify.sh` 通过，包含 `tsc --noEmit`、`bun test`（78 pass / 0 fail，361 expect() calls）和 `bun run scripts/build.ts`。2026-05-19 另完成本地二进制、线上 `template` / `writing-craft` 页面截图验证、slug、密钥扫描、QR 输出和访问统计冒烟测试。
 
 ### 新增
 
@@ -49,6 +49,7 @@
 
 ### 文档
 
+- 更新源码编译安装说明，补充按当前平台选择构建目标、安装 `drop` / `drop-preview` 到 `~/.local/bin`，以及 macOS 与 Linux 构建产物名称差异。
 - 更新 TODO，归档 Git history、隐藏文件默认排除和 diff 对比度修复的完成状态。
 - 更新目录分享文档，说明默认排除隐藏文件、`--include-hidden` 的显式放行语义，以及已配置 `default_excludes` / 显式 `--exclude` 仍优先生效。
 - 更新目录分享文档，说明 Owner unlock 的当前分享范围、最近 100 条窗口、分享过期失效和 owner key 不应分享给访客。

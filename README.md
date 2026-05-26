@@ -171,25 +171,36 @@ Install from a fork or another release repository:
 curl -fsSL https://raw.githubusercontent.com/owner/drop/master/install.sh | DROP_REPO=owner/drop bash
 ```
 
-Build from source:
+Build from source and install to `~/.local/bin`:
 
 ```bash
 git clone https://github.com/junping1/drop.git
 cd drop
 bun install
 
-# Build the default Linux x64 binary.
-bun run build
-cp dist/drop-linux-x64 ~/.local/bin/drop
+# Choose the target for the current machine.
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64|Linux-amd64) TARGET=linux-x64 ;;
+  Linux-aarch64|Linux-arm64) TARGET=linux-arm64 ;;
+  Darwin-x86_64) TARGET=darwin-x64 ;;
+  Darwin-arm64) TARGET=darwin-arm64 ;;
+  *) echo "unsupported platform"; exit 1 ;;
+esac
 
-# Or build for a specific platform.
-bun run scripts/build.ts --target linux-x64
-bun run scripts/build.ts --target linux-arm64
-bun run scripts/build.ts --target darwin-x64
-bun run scripts/build.ts --target darwin-arm64
+bun run scripts/build.ts --target "$TARGET"
+
+mkdir -p ~/.local/bin
+if [[ "$TARGET" == darwin-* ]]; then
+  cp dist/drop ~/.local/bin/drop
+else
+  cp "dist/drop-$TARGET" ~/.local/bin/drop
+fi
+chmod +x ~/.local/bin/drop
+ln -sf ~/.local/bin/drop ~/.local/bin/drop-preview
+~/.local/bin/drop --help
 ```
 
-Source builds require Bun v1.0+. Release assets are expected to be named `drop-linux-x64`, `drop-linux-arm64`, `drop-darwin-x64`, and `drop-darwin-arm64`; see [the release checklist](docs/RELEASE.md) before publishing a release.
+Source builds require Bun v1.0+. `drop-preview` is an alias for `drop`; it is recommended for AI agents and preview-link workflows to avoid confusion with Git discard/drop wording. Release assets are expected to be named `drop-linux-x64`, `drop-linux-arm64`, `drop-darwin-x64`, and `drop-darwin-arm64`; see [the release checklist](docs/RELEASE.md) before publishing a release.
 
 ## Usage
 
@@ -457,7 +468,7 @@ bun run build:release      # build all release assets expected by install.sh
 bun run verify             # run the project verification entrypoint
 ```
 
-Supported build targets are `linux-x64`, `linux-arm64`, `darwin-x64`, and `darwin-arm64`.
+Supported build targets are `linux-x64`, `linux-arm64`, `darwin-x64`, and `darwin-arm64`. macOS targets write `dist/drop`; Linux targets write `dist/drop-<target>`.
 
 ## License
 

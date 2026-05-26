@@ -171,25 +171,36 @@ curl -fsSL https://raw.githubusercontent.com/junping1/drop/master/install.sh | b
 curl -fsSL https://raw.githubusercontent.com/owner/drop/master/install.sh | DROP_REPO=owner/drop bash
 ```
 
-从源码构建：
+从源码构建并安装到 `~/.local/bin`：
 
 ```bash
 git clone https://github.com/junping1/drop.git
 cd drop
 bun install
 
-# 构建默认的 Linux x64 二进制。
-bun run build
-cp dist/drop-linux-x64 ~/.local/bin/drop
+# 选择当前机器对应的目标平台。
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64|Linux-amd64) TARGET=linux-x64 ;;
+  Linux-aarch64|Linux-arm64) TARGET=linux-arm64 ;;
+  Darwin-x86_64) TARGET=darwin-x64 ;;
+  Darwin-arm64) TARGET=darwin-arm64 ;;
+  *) echo "unsupported platform"; exit 1 ;;
+esac
 
-# 或指定目标平台。
-bun run scripts/build.ts --target linux-x64
-bun run scripts/build.ts --target linux-arm64
-bun run scripts/build.ts --target darwin-x64
-bun run scripts/build.ts --target darwin-arm64
+bun run scripts/build.ts --target "$TARGET"
+
+mkdir -p ~/.local/bin
+if [[ "$TARGET" == darwin-* ]]; then
+  cp dist/drop ~/.local/bin/drop
+else
+  cp "dist/drop-$TARGET" ~/.local/bin/drop
+fi
+chmod +x ~/.local/bin/drop
+ln -sf ~/.local/bin/drop ~/.local/bin/drop-preview
+~/.local/bin/drop --help
 ```
 
-源码构建需要 Bun v1.0+。发布资产应命名为 `drop-linux-x64`、`drop-linux-arm64`、`drop-darwin-x64` 和 `drop-darwin-arm64`；发布前请查看 [发布清单](docs/RELEASE.md)。
+源码构建需要 Bun v1.0+。`drop-preview` 是 `drop` 的别名，建议给 AI agent 或预览场景使用，避免和 Git 丢弃改动语义混淆。发布资产应命名为 `drop-linux-x64`、`drop-linux-arm64`、`drop-darwin-x64` 和 `drop-darwin-arm64`；发布前请查看 [发布清单](docs/RELEASE.md)。
 
 ## 使用
 
@@ -457,7 +468,7 @@ bun run build:release      # 构建 install.sh 期望的全部发布资产
 bun run verify             # 运行项目验证入口
 ```
 
-支持的构建目标是 `linux-x64`、`linux-arm64`、`darwin-x64` 和 `darwin-arm64`。
+支持的构建目标是 `linux-x64`、`linux-arm64`、`darwin-x64` 和 `darwin-arm64`。macOS 目标会输出 `dist/drop`；Linux 目标会输出 `dist/drop-<target>`。
 
 ## 许可证
 
