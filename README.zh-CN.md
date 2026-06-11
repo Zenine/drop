@@ -270,7 +270,7 @@ drop ~/project/ --slug demo-dir    # 生成可读的 /d/demo-dir URL
 
 默认排除项：所有 dotfile 和隐藏目录，例如 `.env`、`.github/`、`.idea/`、`.nebula-secrets/`，以及 `__pycache__/`、`node_modules/`、`*.pyc`、`.venv/`。只有明确需要分享隐藏文件时才使用 `--include-hidden`；已配置的 `default_excludes` 和显式 `--exclude` 仍然生效。
 
-当分享目录本身是 Git 仓库时，目录浏览页面会额外显示 `Commits` 标签页。该标签页默认只展示最近 5 条 commit，并且只有这 5 条 commit 的 diff 可以从目录分享中打开。Owner 可以在页面内使用 `Owner unlock` 为当前分享临时解锁到最近 100 条 commit，解锁只持续到该分享过期；owner key 通过 POST 提交，不应分享给访客。这样既保持“查看当前项目文件”为主体验，也减少误暴露更早历史的风险。请把 commit 历史视为敏感内容：其中可能包含已删除文件、历史凭证或私有元数据。
+当分享目录本身是 Git 仓库时，目录浏览页面会额外显示 `Commits` 标签页。该标签页默认只展示最近 5 条 commit，并且只有这 5 条 commit 的 diff 可以从目录分享中打开。Owner 可以在页面内使用 `Owner unlock` 为当前分享临时解锁到最近 100 条 commit，解锁只持续到该分享过期；owner key 通过 POST 提交，不应分享给访客。当访客切回 `Files` 时，如果当前没有选中文件，会回到文件树列表，移动端布局也保持一致。这样既保持“查看当前项目文件”为主体验，也减少误暴露更早历史的风险。请把 commit 历史视为敏感内容：其中可能包含已删除文件、历史凭证或私有元数据。
 
 ### stdin
 
@@ -469,6 +469,8 @@ bun run verify             # 运行项目验证入口
 ```
 
 支持的构建目标是 `linux-x64`、`linux-arm64`、`darwin-x64` 和 `darwin-arm64`。macOS 目标会输出 `dist/drop`；Linux 目标会输出 `dist/drop-<target>`。
+
+重复处理 UI 回归时，请按 [docs/workflows/ui-regression-fixes.md](docs/workflows/ui-regression-fixes.md) 执行：先用聚焦测试复现，再做最小 UI 状态修复，最后运行聚焦测试和 `scripts/verify.sh`。
 
 ## 许可证
 

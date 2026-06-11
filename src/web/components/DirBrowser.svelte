@@ -118,6 +118,9 @@
 
   function showFilesTab() {
     activeTab = 'files';
+    if (!currentFile) {
+      mobileView = 'list';
+    }
   }
 
   function showCommitsTab() {

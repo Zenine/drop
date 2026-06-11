@@ -21,6 +21,7 @@
 
 ### 修复
 
+- 修复移动端 Git 仓库目录分享页中从 `Commits` 切回 `Files` 时，在未选中文件的情况下仍停留在预览面板导致文件列表看起来为空的问题。
 - 修复目录 Git `Commits` 页面在浅色背景下 commit 列表、文件展开行和 diff 行高亮对比度不足的问题；新增/删除行现在分别使用可辨识的绿色/红色背景。
 - 修复打包后二进制在无 `node_modules` 环境中渲染代码预览时仍尝试通过 `highlight.js/package.json` 解析主题 CSS，导致 `drop serve --tunnel` 等服务启动或访问代码预览报缺失依赖的问题；现在 highlight.js 主题 CSS 会在构建时内嵌进二进制。
 - 修复编译后二进制自动启动 daemon 时错误执行 `bun serve` 的问题；现在源码模式和二进制模式都会构造正确的 daemon 启动命令。
@@ -49,6 +50,7 @@
 
 ### 文档
 
+- 更新目录分享文档，说明 `Commits` 切回 `Files` 时未选中文件会回到文件树列表，并新增 UI 回归修复工作流。
 - 更新源码编译安装说明，补充按当前平台选择构建目标、安装 `drop` / `drop-preview` 到 `~/.local/bin`，以及 macOS 与 Linux 构建产物名称差异。
 - 更新 TODO，归档 Git history、隐藏文件默认排除和 diff 对比度修复的完成状态。
 - 更新目录分享文档，说明默认排除隐藏文件、`--include-hidden` 的显式放行语义，以及已配置 `default_excludes` / 显式 `--exclude` 仍优先生效。
