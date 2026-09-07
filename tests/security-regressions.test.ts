@@ -8,6 +8,7 @@ import { addDirAuthorization } from '../src/db/dir-authorizations.js';
 import { renderCode } from '../src/server/render/code.js';
 import { renderMarkdown } from '../src/server/render/markdown.js';
 import { getRenderer } from '../src/server/render/index.js';
+import { dirBrowserShellHtml } from '../src/server/render/html-templates.js';
 import { getClientIpFromHeaders } from '../src/server/middleware/rate-limit.js';
 
 function withTempDb(): string {
@@ -72,6 +73,22 @@ describe('security regressions', () => {
     }
   });
 
+  test('directory browser boot config cannot break out of script strings', () => {
+    const payload = '";globalThis.__dropXss=1;//';
+    const html = dirBrowserShellHtml({
+      dirname: payload,
+      token: 'token',
+      treeJson: '{}',
+      expiresAt: '1',
+      initialFile: payload,
+      basePath: payload,
+    });
+
+    expect(html).not.toContain('dirname: "";globalThis.__dropXss=1;//"');
+    expect(html).not.toContain('initialFile: "";globalThis.__dropXss=1;//"');
+    expect(html).not.toContain('basePath: "";globalThis.__dropXss=1;//"');
+    expect(html).toContain('dirname: "\\";globalThis.__dropXss=1;//"');
+  });
 
   test('svg previews do not inline executable SVG markup', () => {
     const root = mkdtempSync(join(tmpdir(), 'drop-svg-xss-'));

@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-scripts/test-install-config.sh
 bun run check
 bun test
+bash scripts/test-install-config.sh
 bun run build

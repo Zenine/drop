@@ -200,7 +200,7 @@ ln -sf ~/.local/bin/drop ~/.local/bin/drop-preview
 ~/.local/bin/drop --help
 ```
 
-Source builds require Bun v1.0+. `drop-preview` is an alias for `drop`; it is recommended for AI agents and preview-link workflows to avoid confusion with Git discard/drop wording. Release assets are expected to be named `drop-linux-x64`, `drop-linux-arm64`, `drop-darwin-x64`, and `drop-darwin-arm64`; see [the release checklist](docs/RELEASE.md) before publishing a release.
+Source builds require Bun v1.0+. Release assets are expected to be named `drop-linux-x64`, `drop-linux-arm64`, `drop-darwin-x64`, and `drop-darwin-arm64`; see [the release checklist](docs/RELEASE.md) before publishing a release.
 
 ## Usage
 
@@ -270,7 +270,7 @@ drop ~/project/ --slug demo-dir    # readable /d/demo-dir URL
 
 Default excludes: dotfiles and hidden directories such as `.env`, `.github/`, `.idea/`, and `.nebula-secrets/`, plus `__pycache__/`, `node_modules/`, `*.pyc`, and `.venv/`. Use `--include-hidden` only when you intentionally want hidden files included; configured `default_excludes` and explicit `--exclude` patterns still apply.
 
-When the shared directory is a Git repository, the directory browser also shows a `Commits` tab. It is intentionally limited to the latest 5 commits by default, and only those 5 commits can be opened as diffs from the directory share. The owner can use the in-page `Owner unlock` action to unlock the current share to the latest 100 commits until the share expires; the owner key is submitted by POST and should never be shared with visitors. Switching back to `Files` returns visitors to the file tree if no file is selected, including on mobile layouts. This keeps the primary experience focused on the current project files while reducing accidental exposure of older history. Treat commit history as sensitive: it may include deleted files, old credentials, or private metadata.
+When the shared directory is a Git repository, the directory browser also shows a `Commits` tab. It is intentionally limited to the latest 5 commits by default, and only those 5 commits can be opened as diffs from the directory share. The owner can use the in-page `Owner unlock` action to unlock the current share to the latest 100 commits until the share expires; the owner key is submitted by POST and should never be shared with visitors. This keeps the primary experience focused on the current project files while reducing accidental exposure of older history. Treat commit history as sensitive: it may include deleted files, old credentials, or private metadata.
 
 ### Stdin
 
@@ -410,6 +410,7 @@ drop config get base_url
 - Owner access uses HMAC-signed cookies and timing-safe key comparison.
 - Access logging is privacy-preserving: raw IPs, full user agents, full referrers, full target paths, query strings, cookies, and owner keys are not stored.
 - Current rate limiting is 300 requests per minute per client identity. Proxy headers are ignored unless `DROP_TRUST_PROXY=1` is set for a trusted reverse proxy.
+- Markdown raw HTML is escaped, SVG is rendered as an image preview, and template-controlled metadata is HTML-escaped.
 
 Important boundaries:
 
@@ -468,9 +469,7 @@ bun run build:release      # build all release assets expected by install.sh
 bun run verify             # run the project verification entrypoint
 ```
 
-Supported build targets are `linux-x64`, `linux-arm64`, `darwin-x64`, and `darwin-arm64`. macOS targets write `dist/drop`; Linux targets write `dist/drop-<target>`.
-
-For repeatable UI regression fixes, follow [docs/workflows/ui-regression-fixes.md](docs/workflows/ui-regression-fixes.md): reproduce with a focused test first, make the smallest UI state change, then run the focused test and `scripts/verify.sh`.
+Supported build targets are `linux-x64`, `linux-arm64`, `darwin-x64`, and `darwin-arm64`.
 
 ## License
 

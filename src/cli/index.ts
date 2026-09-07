@@ -136,10 +136,9 @@ program
       hostname: host,
       fetch: app.fetch,
     });
-    // Keep the compiled binary alive when the serve command is launched in the
-    // background by auto-start. A long interval is explicit and portable across
-    // Bun source and compiled modes.
-    await new Promise<void>(() => setInterval(() => {}, 60_000));
+    // Bun.serve() keeps the event loop (and the process) alive on its own in
+    // both source and compiled-binary modes, so no explicit keep-alive loop is
+    // needed here.
   });
 
 // allow
@@ -517,6 +516,7 @@ program
     if (resolvedToken) {
       const item = result as ReturnType<typeof getAccessStats>;
       console.log(`${token}: ${item.views} views, ${item.unique} unique, last access ${item.last_access_at ? new Date(item.last_access_at * 1000).toISOString() : 'never'}`);
+      printUniqueCaveat();
       return;
     }
 
@@ -525,7 +525,16 @@ program
     for (const item of aggregate.tokens) {
       console.log(`  ${item.token}  ${item.views} views  ${item.unique} unique  last=${item.last_access_at ? new Date(item.last_access_at * 1000).toISOString() : 'never'}`);
     }
+    printUniqueCaveat();
   });
+
+function printUniqueCaveat(): void {
+  // Without trust_proxy, every client IP is recorded as 127.0.0.1, so the
+  // "unique" count is always 1 (per share) and not meaningful.
+  if (loadConfig().trust_proxy !== true) {
+    console.error('Note: "unique" counts are not meaningful unless trust_proxy is enabled (all clients are recorded as 127.0.0.1).');
+  }
+}
 
 // owner-url
 program

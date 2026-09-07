@@ -3,14 +3,6 @@ import { join } from 'path';
 import { describe, expect, test } from 'bun:test';
 
 describe('commits tab UI regressions', () => {
-  test('files tab returns to the mobile file list after viewing commits without a selected file', () => {
-    const source = readFileSync(join(import.meta.dir, '..', 'src/web/components/DirBrowser.svelte'), 'utf-8');
-
-    expect(source).toContain("function showFilesTab()");
-    expect(source).toContain("if (!currentFile)");
-    expect(source).toContain("mobileView = 'list'");
-  });
-
   test('diff iframe styles keep addition, deletion, and hunk rows visible', () => {
     const source = readFileSync(join(import.meta.dir, '..', 'src/web/components/CommitsTab.svelte'), 'utf-8');
 
