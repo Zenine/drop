@@ -4,7 +4,37 @@
 
 ## 当前状态
 
-当前没有新的未完成事项需要追加到 TODO。今天审阅范围内的更新已经进入实现或完成验证流程，并同步记录到 `CHANGELOG.md`：
+### 等待上游合并的修复 PR（2026-09-08，均基于 upstream/master c1c883b）
+
+- [ ] junping1/drop#14 `pr/secret-scan-gaps`：commit 分享的密钥扫描改为扫描与渲染一致的 `git diff <hash>~1 <hash>`（合并提交不再漏扫）；`.env`/`.env.*`（排除 example/sample/template）和 `id_rsa`/`id_ed25519` 等按敏感文件名阻断；阻断提示补 `--force`/`--no-secret-scan` 说明。
+- [ ] junping1/drop#15 `pr/no-highlight-auto`：未映射语言（`.log`/`.txt`/无扩展名）不再走 `highlightAuto`（285 KB 日志曾同步阻塞 38 秒），改为转义后的 plaintext。
+- [ ] junping1/drop#16 `pr/filename-headers`：`/d/:token/raw` 对非 ASCII 文件名不再 500；`/f/:token` 原始文件补 `Content-Disposition`（DOCX/TIFF 下载不再丢文件名和扩展名）。
+- [ ] junping1/drop#17 `pr/cli-pid-port`：`serve` 先绑端口再写 pid、绑定失败不删他人 pid 文件；`list`/`owner-url`/`serve` 统一读 `config.port`，`owner-url` 走 `buildUrl`。
+- [ ] junping1/drop#18 `pr/loopback-default`：自动拉起的 daemon 默认绑 `127.0.0.1`（原为 `0.0.0.0`，等于无鉴权暴露到局域网），新增 `host` 配置项可显式恢复；含破坏性变更说明与中英文档。
+- 合并后：`git fetch upstream && git merge upstream/master`，重跑 `scripts/verify.sh`，`systemctl --user restart drop.service`，并把本节移入 `CHANGELOG.md`。
+
+### 2026-09-08 审阅遗留（按产品定位分级）
+
+值得修（便宜且有价值）：
+
+- [ ] 限流只认环境变量 `DROP_TRUST_PROXY=1`、不读配置 `trust_proxy`（`src/server/middleware/rate-limit.ts`），公网访客共用一个 300 次/分钟的桶。收口为一个 helper，限流与访问日志共用，README 只写一种配置方式。
+- [ ] `/d/:token/raw` 对 `.html`/`.svg` 以 `text/html`/`image/svg+xml` inline 直出且无 CSP，目录里的 HTML 会在分享域同源执行。加 `Content-Disposition: attachment` 或 `Content-Security-Policy: sandbox`。
+- [ ] `/f/:token` 渲染无大小上限（`MAX_RENDER_SIZE` 已导入未用）；媒体文件 base64 内嵌进 HTML，超过 50 MB 只剩死链接。改为 `new Response(Bun.file(p))` 流式输出，顺带获得 Range 支持。
+- [ ] 文件名含 `%`/`#`/`?` 时前端 `pushState` 未编码、`decodeURIComponent` 无 try/catch（前端 `DirBrowser.svelte` 与服务端 `dir.ts` 各一处）。
+- [ ] `scripts/build.ts` 默认目标 `linux-x64` 与宿主无关；本机是 aarch64，`verify.sh` 产出的二进制本机跑不了。默认按 `process.platform`/`process.arch` 推断。
+- [ ] `~/.local/bin/drop` 是 2026-08-06 的旧二进制，早于两个上游安全修复；用 `bun run scripts/build.ts --target linux-arm64` 重建后替换。
+
+明确不做（与单用户自用工具定位不匹配，记录以免反复翻出）：owner/auth cookie 服务端过期与 `secure`、`/dashboard?key=` 改 POST、`next` 开放重定向、pid 复用误杀、stdin 空输入、`--ttl` 非数字校验、`--exclude` 变参、符号链接绕过排除、CommitsTab 切换重置、面包屑无效、搜索大小写、Google Fonts 外链、`install.sh` 原子写入。
+
+另一台 Mac（2026-09-08 报来的日志）确认的现象与对应修复：中文文件名 PDF 触发 `TypeError: Header ... has invalid value` → #16；17173 端口反复 EADDRINUSE、pid 文件被抹 → #17；`drop.log` 里 `drop serving on http://0.0.0.0:17173` → #18。三条均已在本机复现。Mac 侧还需自行处理（不属 drop 代码）：删除 `~/.drop/drop.pid.agent-start=*`（非 drop 写入）、卸载常驻的 quick tunnel 只留 named tunnel、升级 cloudflared 2026.5.2 → 2026.8.3 并给 stderr 加日志轮转。
+
+流程文档：本轮「审阅 → 分级 → 提上游 PR」的可复用步骤记在 `docs/workflows/upstream-fix-pr.md`，下次同类任务先读该文件。
+
+合并提交相关跟进（来自 #14 审阅）：commit 渲染端 `git diff-tree` 未加 `-m`，合并提交页面不显示任何文件 diff；`scanGitCommit` 未套用敏感文件名规则；diff 扫描无字节上限。
+
+### 之前的说明
+
+今天审阅范围内的其它更新已经进入实现或完成验证流程，并同步记录到 `CHANGELOG.md`：
 
 - 目录分享默认排除 dotfile 和隐藏目录，必要时通过 `--include-hidden` 显式放行。
 - 分享前密钥扫描与目录文件树使用同一套隐藏文件排除语义，且 `--include-hidden` 后会扫描隐藏文件中的密钥。

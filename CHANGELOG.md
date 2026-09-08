@@ -6,6 +6,10 @@
 
 验证：2026-05-26 在本机运行 `scripts/verify.sh` 通过，包含 `tsc --noEmit`、`bun test`（78 pass / 0 fail，361 expect() calls）和 `bun run scripts/build.ts`。2026-05-19 另完成本地二进制、线上 `template` / `writing-craft` 页面截图验证、slug、密钥扫描、QR 输出和访问统计冒烟测试。
 
+### 运维
+
+- 2026-09-07 合并 upstream/master（含 `38c107c` 分享排除规则套用到 commit diff、`bb608a4` 密钥扫描覆盖 served context 行两个安全修复），随后重启 `drop.service`；确认 daemon 仍从源码 `bun run src/cli/index.ts serve` 启动，`~/.drop` 权限保持 700。2026-09-08 复核：本地 master 对 upstream 0 落后，`scripts/verify.sh` 通过（88 pass / 0 fail / 394 expect）。
+
 ### 新增
 
 - Git 仓库目录分享页面新增 Owner unlock，可在当前分享范围内用 owner key 临时解锁到最近 100 条 commit，解锁随分享过期失效。
@@ -50,6 +54,7 @@
 
 ### 文档
 
+- 新增 `docs/workflows/upstream-fix-pr.md`，固化「只读上下文检查 → 分面审阅与按产品定位分级 → 基于 upstream/master 建独立工作树修复 → 审阅与复审 → 提 PR → 收尾」的流程，含测试隔离红线（不得读写真实 `~/.drop`、不得绑定 17173/17174）和提交信息不加署名的要求。
 - 更新目录分享文档，说明 `Commits` 切回 `Files` 时未选中文件会回到文件树列表，并新增 UI 回归修复工作流。
 - 更新源码编译安装说明，补充按当前平台选择构建目标、安装 `drop` / `drop-preview` 到 `~/.local/bin`，以及 macOS 与 Linux 构建产物名称差异。
 - 更新 TODO，归档 Git history、隐藏文件默认排除和 diff 对比度修复的完成状态。
