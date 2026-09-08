@@ -86,6 +86,10 @@ function resolvePort(cfg: Record<string, unknown>, opts: { port?: string } = {})
   return cfg.port ? Number(cfg.port) : parseInt(opts.port ?? String(DEFAULT_PORT), 10);
 }
 
+function resolveHost(cfg: Record<string, unknown>, opts?: { host?: string }): string {
+  return (cfg.host as string | undefined) || opts?.host || DEFAULT_HOST;
+}
+
 function applySlug(
   cfg: Record<string, unknown>,
   type: 'file' | 'dir' | 'git',
@@ -121,7 +125,7 @@ program
 
     const cfg = loadConfig();
     const port = resolvePort(cfg, opts);
-    const host = opts.host;
+    const host = resolveHost(cfg, opts);
 
     const { app } = await import('../server/index.js');
 
@@ -226,7 +230,7 @@ program
         },
       );
 
-      if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
+      if (!isDaemonRunning()) await startDaemon(port, resolveHost(cfg));
     } else if (isFile) {
       const ttl = opts.ttl ? parseInt(opts.ttl, 10) : (cfg.file_ttl || DEFAULT_TTL);
       const { token, filename, isNew } = addAuthorization(path, ttl, opts.live);
@@ -252,7 +256,7 @@ program
         },
       );
 
-      if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
+      if (!isDaemonRunning()) await startDaemon(port, resolveHost(cfg));
     }
   });
 
@@ -316,7 +320,7 @@ program
       },
     );
 
-    if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
+    if (!isDaemonRunning()) await startDaemon(port, resolveHost(cfg));
   });
 
 // allow-git
@@ -361,7 +365,7 @@ program
         },
       );
 
-      if (!isDaemonRunning()) await startDaemon(port, DEFAULT_HOST);
+      if (!isDaemonRunning()) await startDaemon(port, resolveHost(cfg));
     } catch (e: any) {
       outputShareError(e.message, { json: opts.json, qr: opts.qr });
       process.exit(1);
