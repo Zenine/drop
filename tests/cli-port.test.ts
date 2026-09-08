@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -24,6 +24,21 @@ function writeConfig(root: string, config: Record<string, unknown>): void {
   const stateDir = join(root, '.drop');
   mkdirSync(stateDir, { recursive: true });
   writeFileSync(join(stateDir, 'config.json'), JSON.stringify(config, null, 2) + '\n');
+}
+
+// `drop allow` auto-starts a daemon when none is running. These tests point
+// HOME at a temp dir, so that daemon is ours to clean up: without this the
+// process survives the test run and keeps holding the configured port.
+function stopSpawnedDaemon(root: string): void {
+  const pidPath = join(root, '.drop', 'drop.pid');
+  if (!existsSync(pidPath)) return;
+  const pid = Number(readFileSync(pidPath, 'utf-8').trim());
+  if (!Number.isInteger(pid) || pid <= 0) return;
+  try {
+    process.kill(pid, 'SIGTERM');
+  } catch {
+    // already gone
+  }
 }
 
 function runDrop(args: string[], env: Record<string, string>) {
@@ -53,6 +68,7 @@ describe('CLI port resolution honours config.port', () => {
       expect(items).toHaveLength(1);
       expect(items[0].url).toContain(':17999');
     } finally {
+      stopSpawnedDaemon(root);
       rmSync(root, { recursive: true, force: true });
     }
   });
@@ -67,6 +83,7 @@ describe('CLI port resolution honours config.port', () => {
       expect(run.exitCode).toBe(0);
       expect(run.stdout.toString()).toContain(':17999');
     } finally {
+      stopSpawnedDaemon(root);
       rmSync(root, { recursive: true, force: true });
     }
   });
@@ -83,6 +100,7 @@ describe('CLI port resolution honours config.port', () => {
       expect(out).toContain('https://example.test/dashboard?key=');
       expect(out).not.toContain(':17999');
     } finally {
+      stopSpawnedDaemon(root);
       rmSync(root, { recursive: true, force: true });
     }
   });
