@@ -8,6 +8,8 @@
 
 ### 运维
 
+- 2026-09-09 将第二批修复（junping1/drop#19–#24）合并进本地 master 并重启 `drop.service`。合并冲突三处：`secret-scan.ts` 中 #24 把 `runGit` 换成返回 Buffer 的 `runGitBuffer`，与本地 #14 的 `getCommitDiff` 不兼容，已统一走 Buffer 并同时保留“扫描与渲染同源的 diff”和“字节上限 + 截断提示”；`dir.ts`、`file.ts` 中 #20/#21 因上游缺少 #16 的共享 `contentDisposition` 而各自自建了语义等价实现，已统一到共享 helper 并删除重复。验证：`scripts/verify.sh` 通过（163 pass / 0 fail / 578 expect），构建产物为 `dist/drop-linux-arm64`（本机可执行）。重启后线上实测：目录 raw 对 `.html` 返回 `text/plain` + `attachment` + CSP sandbox；含中文、空格和 `%` 的文件名返回 200 且 `filename*` 正确；畸形转义路径返回 400；6 MB `.log` 走流式 raw，20 毫秒返回。
+
 - 2026-09-07 合并 upstream/master（含 `38c107c` 分享排除规则套用到 commit diff、`bb608a4` 密钥扫描覆盖 served context 行两个安全修复），随后重启 `drop.service`；确认 daemon 仍从源码 `bun run src/cli/index.ts serve` 启动，`~/.drop` 权限保持 700。2026-09-08 复核：本地 master 对 upstream 0 落后，`scripts/verify.sh` 通过（88 pass / 0 fail / 394 expect）。
 
 ### 新增

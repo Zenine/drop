@@ -4,7 +4,9 @@
 
 ## 当前状态
 
-### 等待上游合并的修复 PR（2026-09-08，均基于 upstream/master c1c883b）
+### 等待上游合并的修复 PR（2026-09-08 提交，均基于 upstream/master c1c883b）
+
+> 本地 master 已于 2026-09-09 合入全部 11 个分支并重启服务，本机已生效；以下条目只等上游合并后收尾。
 
 - [ ] junping1/drop#14 `pr/secret-scan-gaps`：commit 分享的密钥扫描改为扫描与渲染一致的 `git diff <hash>~1 <hash>`（合并提交不再漏扫）；`.env`/`.env.*`（排除 example/sample/template）和 `id_rsa`/`id_ed25519` 等按敏感文件名阻断；阻断提示补 `--force`/`--no-secret-scan` 说明。
 - [ ] junping1/drop#15 `pr/no-highlight-auto`：未映射语言（`.log`/`.txt`/无扩展名）不再走 `highlightAuto`（285 KB 日志曾同步阻塞 38 秒），改为转义后的 plaintext。
@@ -17,7 +19,7 @@
 - [ ] junping1/drop#22 `pr/path-encoding`：目录分享路径按段编码，前后端 `decodeURIComponent` 加保护，含 `%`/`#`/`?` 的文件名不再破坏前进后退和深链。
 - [ ] junping1/drop#23 `pr/build-host-target`：`scripts/build.ts` 默认目标按宿主平台推断（`build-release.ts` 保持显式四目标不变）。
 - [ ] junping1/drop#24 `pr/git-commit-shares`：合并提交页面不再空白（`diff-tree` 支持合并并按路径去重），commit 密钥扫描补敏感文件名规则与字节上限。
-- 合并后：`git fetch upstream && git merge upstream/master`，重跑 `scripts/verify.sh`，`systemctl --user restart drop.service`，并把本节移入 `CHANGELOG.md`。
+- 上游合并后：`git fetch upstream && git merge upstream/master`（同样的改动从两边进来，Git 一般能干净处理），重跑 `scripts/verify.sh`，`systemctl --user restart drop.service`，并把本节移入 `CHANGELOG.md`。
 
 ### 2026-09-08 审阅遗留（按产品定位分级）
 
@@ -27,7 +29,7 @@
 
 剩余未处理：
 
-- [ ] `~/.local/bin/drop` 是 2026-08-06 的旧二进制，早于所有修复；#23 合并后用 `bun run scripts/build.ts` 重建替换，或删掉 `drop-preview` 软链避免误用。
+- [ ] `~/.local/bin/drop` 是 2026-08-06 的旧二进制，早于所有修复；本地已含 #23，直接 `bun run scripts/build.ts`（默认即宿主平台，产物 `dist/drop-linux-arm64`）后复制替换，或删掉 `drop-preview` 软链避免误用。
 - [ ] `PID_PATH` 没有环境变量覆盖，`tests/cli-slug.test.ts` 仍会快照并还原真实 `~/.drop/drop.pid`；`ensureStateDir()` 也仍会创建 `~/.drop`。#19 已把配置这条路堵死，pid 这条留作后续。
 - [ ] `/f/:token/raw` 的 Range 支持来自 `Bun.file()`，没有测试覆盖。
 
