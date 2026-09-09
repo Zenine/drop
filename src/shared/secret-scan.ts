@@ -254,12 +254,12 @@ function cleanGitEnv(): Record<string, string> {
   return env;
 }
 
-function runGit(args: string[], cwd: string): string {
+function runGitBuffer(args: string[], cwd: string): Buffer {
   const result = Bun.spawnSync(['git', ...args], { cwd, env: cleanGitEnv(), stdout: 'pipe', stderr: 'pipe' });
   if (result.exitCode !== 0) {
     throw new Error(`git ${args[0]} failed: ${result.stderr.toString()}`);
   }
-  return result.stdout.toString();
+  return Buffer.from(result.stdout);
 }
 
 // Produce the same diff content that git-authorizations.ts serves to viewers
@@ -269,14 +269,14 @@ function runGit(args: string[], cwd: string): string {
 // first parent, so it includes everything a merge brought in — unlike
 // `git show` on a merge commit, which prints a condensed combined diff that
 // omits nearly everything.
-function getCommitDiff(repoPath: string, commitHash: string): string {
+function getCommitDiff(repoPath: string, commitHash: string): Buffer {
   try {
-    runGit(['rev-parse', '--verify', '--quiet', `${commitHash}~1`], repoPath);
+    runGitBuffer(['rev-parse', '--verify', '--quiet', `${commitHash}~1`], repoPath);
   } catch {
     // No parent commit (root commit): fall back to `git show`.
-    return runGit(['show', '--format=', '--no-ext-diff', commitHash], repoPath);
+    return runGitBuffer(['show', '--format=', '--no-ext-diff', commitHash], repoPath);
   }
-  return runGit(['diff', '--no-ext-diff', `${commitHash}~1`, commitHash], repoPath);
+  return runGitBuffer(['diff', '--no-ext-diff', `${commitHash}~1`, commitHash], repoPath);
 }
 
 export function scanGitCommit(repoPath: string, commitHash: string): SecretScanResult {
@@ -285,7 +285,14 @@ export function scanGitCommit(repoPath: string, commitHash: string): SecretScanR
   // (src/db/git-authorizations.ts) uses default context, so unchanged context
   // lines are disclosed too — scan added AND context lines, not just '+' lines,
   // or a secret on a context line adjacent to an edit would leak unscanned.
-  const output = getCommitDiff(repoPath, commitHash);
+  const rawOutput = getCommitDiff(repoPath, commitHash);
+  // File reads are capped at MAX_SCAN_BYTES (see scanFile); cap the diff the
+  // same way so an oversized commit cannot exhaust memory/time, and tell the
+  // caller the scan was incomplete rather than silently passing an unscanned
+  // remainder.
+  const truncated = rawOutput.length > MAX_SCAN_BYTES;
+  const output = (truncated ? rawOutput.subarray(0, MAX_SCAN_BYTES) : rawOutput).toString('utf8');
+  const scannedFilenames = new Set<string>();
   let currentPath = '<git-diff>';
   let newLine = 0;
 
@@ -293,6 +300,13 @@ export function scanGitCommit(repoPath: string, commitHash: string): SecretScanR
     const fileMatch = /^\+\+\+ b\/(.+)$/.exec(line);
     if (fileMatch) {
       currentPath = fileMatch[1];
+      // scanFile()/scanPath() also run a sensitive-filename check; apply the
+      // same rule here so a commit that adds e.g. credentials.json is caught
+      // even when its content doesn't match a content regex.
+      if (!scannedFilenames.has(currentPath)) {
+        scannedFilenames.add(currentPath);
+        findings.push(...scanSensitiveFilename(currentPath));
+      }
       continue;
     }
 
@@ -314,6 +328,16 @@ export function scanGitCommit(repoPath: string, commitHash: string): SecretScanR
       newLine++;
     }
     // Removed ('-') lines are not served; skip them without advancing newLine.
+  }
+
+  if (truncated) {
+    findings.push({
+      path: '<git-diff>',
+      line: 1,
+      rule_id: 'scan-truncated',
+      severity: 'high',
+      fingerprint: fingerprint('scan-truncated', commitHash),
+    });
   }
 
   return { blocked: findings.length > 0, findings };
