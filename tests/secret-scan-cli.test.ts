@@ -67,11 +67,17 @@ describe('secret scan CLI integration', () => {
 
       closeDb();
       process.env.DROP_DB = env.DROP_DB;
+      // The lines below call getDb()/app.request() in THIS (parent) process,
+      // not the isolated child subprocess spawned via makeEnv()'s HOME
+      // override — recordAccessEvent()/getOwnerKey() would otherwise touch
+      // the real ~/.drop/config.json.
+      process.env.DROP_CONFIG = join(root, 'config.json');
       const db = getDb();
       expect(db.query('SELECT COUNT(*) as cnt FROM authorizations').get()).toEqual({ cnt: 0 });
     } finally {
       closeDb();
       delete process.env.DROP_DB;
+      delete process.env.DROP_CONFIG;
       rmSync(root, { recursive: true, force: true });
     }
   });
@@ -156,11 +162,17 @@ describe('secret scan CLI integration', () => {
 
       closeDb();
       process.env.DROP_DB = env.DROP_DB;
+      // The lines below call getDb()/app.request() in THIS (parent) process,
+      // not the isolated child subprocess spawned via makeEnv()'s HOME
+      // override — recordAccessEvent()/getOwnerKey() would otherwise touch
+      // the real ~/.drop/config.json.
+      process.env.DROP_CONFIG = join(root, 'config.json');
       const db = getDb();
       expect(db.query('SELECT COUNT(*) as cnt FROM git_authorizations').get()).toEqual({ cnt: 0 });
     } finally {
       closeDb();
       delete process.env.DROP_DB;
+      delete process.env.DROP_CONFIG;
       rmSync(root, { recursive: true, force: true });
     }
   });
@@ -223,6 +235,11 @@ describe('secret scan CLI integration', () => {
 
       closeDb();
       process.env.DROP_DB = env.DROP_DB;
+      // The lines below call getDb()/app.request() in THIS (parent) process,
+      // not the isolated child subprocess spawned via makeEnv()'s HOME
+      // override — recordAccessEvent()/getOwnerKey() would otherwise touch
+      // the real ~/.drop/config.json.
+      process.env.DROP_CONFIG = join(root, 'config.json');
       const page = await app.request(`/d/${payload.token}`);
       const html = await page.text();
       expect(page.status).toBe(200);
@@ -233,6 +250,7 @@ describe('secret scan CLI integration', () => {
     } finally {
       closeDb();
       delete process.env.DROP_DB;
+      delete process.env.DROP_CONFIG;
       rmSync(root, { recursive: true, force: true });
     }
   });
@@ -289,6 +307,11 @@ describe('secret scan CLI integration', () => {
 
       closeDb();
       process.env.DROP_DB = env.DROP_DB;
+      // The lines below call getDb()/app.request() in THIS (parent) process,
+      // not the isolated child subprocess spawned via makeEnv()'s HOME
+      // override — recordAccessEvent()/getOwnerKey() would otherwise touch
+      // the real ~/.drop/config.json.
+      process.env.DROP_CONFIG = join(root, 'config.json');
       const page = await app.request(`/d/${payload.token}`);
       const html = await page.text();
       expect(page.status).toBe(200);
@@ -298,6 +321,7 @@ describe('secret scan CLI integration', () => {
     } finally {
       closeDb();
       delete process.env.DROP_DB;
+      delete process.env.DROP_CONFIG;
       rmSync(root, { recursive: true, force: true });
     }
   });
