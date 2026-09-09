@@ -431,13 +431,28 @@ dirRoutes.get('/d/:token/raw', (c) => {
   const absPath = validateDirPath(row!.dirpath, relPath, excludes);
   if (!absPath) return c.text('Access denied', 403);
 
-  const contentType = guessMime(absPath);
+  const guessedType = guessMime(absPath);
+  const isExecutableDocument =
+    guessedType === 'text/html' ||
+    guessedType === 'application/xhtml+xml' ||
+    guessedType === 'image/svg+xml';
 
   const data = readFileSync(absPath);
   recordRouteAccess(c, row!.token, 'dir', 'raw_view', relPath);
+
+  if (isExecutableDocument) {
+    return new Response(data, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Disposition': contentDisposition('attachment', basename(absPath)),
+        'Content-Security-Policy': 'sandbox',
+      },
+    });
+  }
+
   return new Response(data, {
     headers: {
-      'Content-Type': contentType,
+      'Content-Type': guessedType,
       'Content-Disposition': contentDisposition('inline', basename(absPath)),
     },
   });
