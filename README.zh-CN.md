@@ -178,22 +178,19 @@ git clone https://github.com/junping1/drop.git
 cd drop
 bun install
 
-# 选择当前机器对应的目标平台。
-case "$(uname -s)-$(uname -m)" in
-  Linux-x86_64|Linux-amd64) TARGET=linux-x64 ;;
-  Linux-aarch64|Linux-arm64) TARGET=linux-arm64 ;;
-  Darwin-x86_64) TARGET=darwin-x64 ;;
-  Darwin-arm64) TARGET=darwin-arm64 ;;
-  *) echo "unsupported platform"; exit 1 ;;
-esac
-
-bun run scripts/build.ts --target "$TARGET"
+# 构建目标默认为宿主平台。
+# 需要交叉构建其它平台时，给 scripts/build.ts 传 --target。
+bun run build
 
 mkdir -p ~/.local/bin
-if [[ "$TARGET" == darwin-* ]]; then
+if [[ "$(uname -s)" == "Darwin" ]]; then
   cp dist/drop ~/.local/bin/drop
 else
-  cp "dist/drop-$TARGET" ~/.local/bin/drop
+  case "$(uname -m)" in
+    x86_64|amd64)  cp dist/drop-linux-x64 ~/.local/bin/drop ;;
+    aarch64|arm64) cp dist/drop-linux-arm64 ~/.local/bin/drop ;;
+    *) echo "unsupported platform"; exit 1 ;;
+  esac
 fi
 chmod +x ~/.local/bin/drop
 ln -sf ~/.local/bin/drop ~/.local/bin/drop-preview
@@ -464,7 +461,7 @@ bun install
 bun run dev:serve          # 前台启动服务
 bun run build:web          # 构建 Svelte 目录浏览器
 bun run dev:web            # 运行 Svelte 开发服务
-bun run build              # 编译默认的 linux-x64 单文件二进制
+bun run build              # 编译宿主平台的单文件二进制
 bun run scripts/build.ts --target darwin-x64   # 构建指定目标平台
 bun run build:release      # 构建 install.sh 期望的全部发布资产
 bun run verify             # 运行项目验证入口

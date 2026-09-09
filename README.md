@@ -178,22 +178,19 @@ git clone https://github.com/junping1/drop.git
 cd drop
 bun install
 
-# Choose the target for the current machine.
-case "$(uname -s)-$(uname -m)" in
-  Linux-x86_64|Linux-amd64) TARGET=linux-x64 ;;
-  Linux-aarch64|Linux-arm64) TARGET=linux-arm64 ;;
-  Darwin-x86_64) TARGET=darwin-x64 ;;
-  Darwin-arm64) TARGET=darwin-arm64 ;;
-  *) echo "unsupported platform"; exit 1 ;;
-esac
-
-bun run scripts/build.ts --target "$TARGET"
+# The build target defaults to the host platform.
+# Pass --target to scripts/build.ts to cross-build for another one.
+bun run build
 
 mkdir -p ~/.local/bin
-if [[ "$TARGET" == darwin-* ]]; then
+if [[ "$(uname -s)" == "Darwin" ]]; then
   cp dist/drop ~/.local/bin/drop
 else
-  cp "dist/drop-$TARGET" ~/.local/bin/drop
+  case "$(uname -m)" in
+    x86_64|amd64)  cp dist/drop-linux-x64 ~/.local/bin/drop ;;
+    aarch64|arm64) cp dist/drop-linux-arm64 ~/.local/bin/drop ;;
+    *) echo "unsupported platform"; exit 1 ;;
+  esac
 fi
 chmod +x ~/.local/bin/drop
 ln -sf ~/.local/bin/drop ~/.local/bin/drop-preview
@@ -465,7 +462,7 @@ bun install
 bun run dev:serve          # start server in foreground
 bun run build:web          # build the Svelte directory browser
 bun run dev:web            # run the Svelte dev server
-bun run build              # compile the default linux-x64 standalone binary
+bun run build              # compile a standalone binary for the host platform
 bun run scripts/build.ts --target darwin-x64   # build a specific target
 bun run build:release      # build all release assets expected by install.sh
 bun run verify             # run the project verification entrypoint
