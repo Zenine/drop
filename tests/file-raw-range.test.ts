@@ -110,3 +110,37 @@ describe('raw file responses support length and ranges', () => {
     });
   }
 });
+
+describe('ranged responses over a real Bun.serve socket', () => {
+  // app.fetch() keeps whatever headers the handler set, but Bun.serve drops
+  // Content-Length for streamed bodies and falls back to chunked encoding.
+  // Safari refuses to play media whose 206 responses lack Content-Length.
+  test('206 responses carry Content-Length and are not chunked', async () => {
+    const root = withTempDb();
+    const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: app.fetch });
+    try {
+      const { file, bytes } = makePdf(root, 3 * 1024 * 1024);
+      const token = addAuthorization(file, 60).token;
+      for (const [range, start, end] of [['bytes=0-1', 0, 1], ['bytes=1000-', 1000, bytes.length - 1]] as const) {
+        const res = await fetch(`http://127.0.0.1:${server.port}/f/${token}/raw`, {
+          headers: { Range: range, 'cf-connecting-ip': '198.51.100.250' },
+        });
+        expect(res.status).toBe(206);
+        expect(res.headers.get('transfer-encoding')).toBeNull();
+        const len = Number(res.headers.get('content-length'));
+        const m = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(res.headers.get('content-range') || '');
+        expect(m).not.toBeNull();
+        expect(Number(m![1])).toBe(start);
+        expect(Number(m![3])).toBe(bytes.length);
+        const lastServed = Number(m![2]);
+        expect(lastServed).toBeLessThanOrEqual(end);   // servers may shorten an open-ended range
+        const body = Buffer.from(await res.arrayBuffer());
+        expect(len).toBe(lastServed - start + 1);
+        expect(body.equals(bytes.subarray(start, lastServed + 1))).toBe(true);
+      }
+    } finally {
+      server.stop(true);
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
