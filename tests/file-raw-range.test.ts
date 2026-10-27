@@ -117,13 +117,14 @@ describe('ranged responses over a real Bun.serve socket', () => {
   // Safari refuses to play media whose 206 responses lack Content-Length.
   test('206 responses carry Content-Length and are not chunked', async () => {
     const root = withTempDb();
+    process.env.DROP_TRUST_PROXY = '1';             // per-request client IPs keep the shared rate limiter out of the way
     const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: app.fetch });
     try {
       const { file, bytes } = makePdf(root, 3 * 1024 * 1024);
       const token = addAuthorization(file, 60).token;
-      for (const [range, start, end] of [['bytes=0-1', 0, 1], ['bytes=1000-', 1000, bytes.length - 1]] as const) {
+      for (const [i, [range, start, end]] of ([['bytes=0-1', 0, 1], ['bytes=1000-', 1000, bytes.length - 1]] as const).entries()) {
         const res = await fetch(`http://127.0.0.1:${server.port}/f/${token}/raw`, {
-          headers: { Range: range, 'cf-connecting-ip': '198.51.100.250' },
+          headers: { Range: range, 'cf-connecting-ip': `198.51.100.${240 + i}` },
         });
         expect(res.status).toBe(206);
         expect(res.headers.get('transfer-encoding')).toBeNull();
