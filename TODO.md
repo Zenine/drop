@@ -15,7 +15,7 @@
 - [ ] junping1/drop#18 `pr/loopback-default`：自动拉起的 daemon 默认绑 `127.0.0.1`（原为 `0.0.0.0`，等于无鉴权暴露到局域网），新增 `host` 配置项可显式恢复；含破坏性变更说明与中英文档。
 - [ ] junping1/drop#19 `pr/trust-proxy-config`：限流与访问日志统一用 `isProxyTrusted()`（原先限流只认环境变量，导致公网访客共用一个 300 次/分钟的桶）；新增 `DROP_CONFIG` 路径覆盖并让所有触碰配置的测试指向临时文件。
 - [ ] junping1/drop#20 `pr/raw-content-security`：`/d/:token/raw` 对 HTML/XHTML/SVG 改为非可执行类型 + `attachment` + CSP sandbox，并顺带修掉该路由上非 ASCII 文件名 500 的问题。
-- [ ] junping1/drop#21 `pr/render-size-limits`：`/f/` 套用 `MAX_RENDER_SIZE`、改 `Bun.file()` 流式输出、媒体不再 base64 内嵌；新增 `/f/:token/raw`（复用原鉴权与过期逻辑）。
+- [ ] junping1/drop#21 `pr/render-size-limits`：（2026-10-27 追加两个提交：原始文件响应补 `Content-Length`、`Accept-Ranges`，单段 Range 返回 206/416，HEAD 报真实大小；修复 Chrome PDF 查看器“未能加载 PDF 文档”。测试 `tests/file-raw-range.test.ts`；本地 master 已合并并重启服务）`/f/` 套用 `MAX_RENDER_SIZE`、改 `Bun.file()` 流式输出、媒体不再 base64 内嵌；新增 `/f/:token/raw`（复用原鉴权与过期逻辑）。
 - [ ] junping1/drop#22 `pr/path-encoding`：目录分享路径按段编码，前后端 `decodeURIComponent` 加保护，含 `%`/`#`/`?` 的文件名不再破坏前进后退和深链。
 - [ ] junping1/drop#23 `pr/build-host-target`：`scripts/build.ts` 默认目标按宿主平台推断（`build-release.ts` 保持显式四目标不变）。
 - [ ] junping1/drop#24 `pr/git-commit-shares`：合并提交页面不再空白（`diff-tree` 支持合并并按路径去重），commit 密钥扫描补敏感文件名规则与字节上限。
