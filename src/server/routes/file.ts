@@ -71,18 +71,65 @@ function getFileAuth(c: any): { row: FileAuthorization | null; expiredHtml: stri
 // a plain-text download instead. (Mirrors the fix applied to /d/:token/raw.)
 const UNSAFE_INLINE_TYPES = new Set(['text/html', 'application/xhtml+xml', 'image/svg+xml']);
 
-/** Stream a file's bytes with the correct content type (supports Range via Bun.file). */
-function rawFileResponse(filepath: string): Response {
+/**
+ * Parse a single-range `Range: bytes=...` header against a file of `size`
+ * bytes. Returns null when absent or not a single byte range (serve the whole
+ * file), 'unsatisfiable' when it cannot be satisfied, else inclusive bounds.
+ */
+function parseRange(header: string | undefined, size: number): { start: number; end: number } | 'unsatisfiable' | null {
+  if (!header) return null;
+  const m = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!m || (m[1] === '' && m[2] === '')) return null;
+  let start: number;
+  let end: number;
+  if (m[1] === '') {
+    const n = parseInt(m[2], 10);
+    if (n === 0) return 'unsatisfiable';
+    start = Math.max(0, size - n);
+    end = size - 1;
+  } else {
+    start = parseInt(m[1], 10);
+    end = m[2] === '' ? size - 1 : Math.min(parseInt(m[2], 10), size - 1);
+  }
+  if (start >= size || start > end) return 'unsatisfiable';
+  return { start, end };
+}
+
+/**
+ * Stream a file's bytes with the correct content type, an explicit
+ * Content-Length and single-range support (206/416). Browser PDF viewers and
+ * media players depend on these; Bun does not add them for a Response built
+ * from Bun.file() with custom headers, and HEAD would otherwise report 0.
+ */
+function rawFileResponse(c: any, filepath: string): Response {
   const guessedMime = guessMime(filepath);
   const unsafe = UNSAFE_INLINE_TYPES.has(guessedMime);
   const contentType = unsafe ? 'text/plain; charset=utf-8' : guessedMime;
   const disposition = unsafe ? 'attachment' : 'inline';
-  return new Response(Bun.file(filepath), {
-    headers: {
-      'Content-Type': contentType,
-      'Content-Disposition': contentDisposition(disposition, basename(filepath)),
-    },
-  });
+  const file = Bun.file(filepath);
+  const size = file.size;
+  const headers: Record<string, string> = {
+    'Content-Type': contentType,
+    'Content-Disposition': contentDisposition(disposition, basename(filepath)),
+    'Accept-Ranges': 'bytes',
+  };
+  const isHead = c.req.method === 'HEAD';
+  const range = parseRange(c.req.header('range'), size);
+
+  if (range === 'unsatisfiable') {
+    return new Response(null, { status: 416, headers: { ...headers, 'Content-Range': `bytes */${size}` } });
+  }
+  if (range) {
+    const length = range.end - range.start + 1;
+    // Use the slice's own stream: when Hono re-wraps a Response built from a
+    // sliced Bun.file via its .body stream, Bun ignores the slice end and
+    // streams to EOF (observed on Bun 1.3.14).
+    return new Response(isHead ? null : file.slice(range.start, range.end + 1).stream(), {
+      status: 206,
+      headers: { ...headers, 'Content-Range': `bytes ${range.start}-${range.end}/${size}`, 'Content-Length': String(length) },
+    });
+  }
+  return new Response(isHead ? null : file, { headers: { ...headers, 'Content-Length': String(size) } });
 }
 
 function serveFileHandler(c: any) {
@@ -131,7 +178,7 @@ function serveFileHandler(c: any) {
 
   // Serve raw file (images, PDFs, binary, and oversized text-ish files)
   recordRouteAccess(c, token, 'file', 'page_view');
-  return rawFileResponse(filepath);
+  return rawFileResponse(c, filepath);
 }
 
 function serveFileRawHandler(c: any) {
@@ -159,7 +206,7 @@ function serveFileRawHandler(c: any) {
   // shares specifically, while still keeping the raw_view row in the log and
   // in the by_event_type breakdown.
   recordRouteAccess(c, token, 'file', 'raw_view');
-  return rawFileResponse(filepath);
+  return rawFileResponse(c, filepath);
 }
 
 // Specific /raw route must be registered before the generic :filename route.
