@@ -71,6 +71,9 @@ function getFileAuth(c: any): { row: FileAuthorization | null; expiredHtml: stri
 // a plain-text download instead. (Mirrors the fix applied to /d/:token/raw.)
 const UNSAFE_INLINE_TYPES = new Set(['text/html', 'application/xhtml+xml', 'image/svg+xml']);
 
+/** Largest body returned for one Range request (see rawFileResponse). */
+const MAX_RANGE_CHUNK = 8 * 1024 * 1024;
+
 /**
  * Parse a single-range `Range: bytes=...` header against a file of `size`
  * bytes. Returns null when absent or not a single byte range (serve the whole
@@ -101,7 +104,7 @@ function parseRange(header: string | undefined, size: number): { start: number; 
  * media players depend on these; Bun does not add them for a Response built
  * from Bun.file() with custom headers, and HEAD would otherwise report 0.
  */
-function rawFileResponse(c: any, filepath: string): Response {
+async function rawFileResponse(c: any, filepath: string): Promise<Response> {
   const guessedMime = guessMime(filepath);
   const unsafe = UNSAFE_INLINE_TYPES.has(guessedMime);
   const contentType = unsafe ? 'text/plain; charset=utf-8' : guessedMime;
@@ -120,13 +123,17 @@ function rawFileResponse(c: any, filepath: string): Response {
     return new Response(null, { status: 416, headers: { ...headers, 'Content-Range': `bytes */${size}` } });
   }
   if (range) {
-    const length = range.end - range.start + 1;
-    // Use the slice's own stream: when Hono re-wraps a Response built from a
-    // sliced Bun.file via its .body stream, Bun ignores the slice end and
-    // streams to EOF (observed on Bun 1.3.14).
-    return new Response(isHead ? null : file.slice(range.start, range.end + 1).stream(), {
+    // Send ranged bodies as in-memory bytes so Bun emits an exact
+    // Content-Length (a streamed body is sent chunked, and Safari refuses to
+    // play media whose 206 responses are chunked). Cap each response at
+    // MAX_RANGE_CHUNK; returning a shorter range than an open-ended request
+    // asked for is allowed, and players request the next chunk.
+    const end = Math.min(range.end, range.start + MAX_RANGE_CHUNK - 1);
+    const length = end - range.start + 1;
+    const body = isHead ? null : new Uint8Array(await file.slice(range.start, end + 1).arrayBuffer());
+    return new Response(body, {
       status: 206,
-      headers: { ...headers, 'Content-Range': `bytes ${range.start}-${range.end}/${size}`, 'Content-Length': String(length) },
+      headers: { ...headers, 'Content-Range': `bytes ${range.start}-${end}/${size}`, 'Content-Length': String(length) },
     });
   }
   return new Response(isHead ? null : file, { headers: { ...headers, 'Content-Length': String(size) } });
