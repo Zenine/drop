@@ -19,6 +19,7 @@
 - [ ] junping1/drop#22 `pr/path-encoding`：目录分享路径按段编码，前后端 `decodeURIComponent` 加保护，含 `%`/`#`/`?` 的文件名不再破坏前进后退和深链。
 - [ ] junping1/drop#23 `pr/build-host-target`：`scripts/build.ts` 默认目标按宿主平台推断（`build-release.ts` 保持显式四目标不变）。
 - [ ] junping1/drop#24 `pr/git-commit-shares`：合并提交页面不再空白（`diff-tree` 支持合并并按路径去重），commit 密钥扫描补敏感文件名规则与字节上限。
+- [ ] junping1/drop#25 `pr/stream-idle-timeout`（2026-10-27）：`/f/`、`/d/` 分享请求取消 Bun 空闲超时（`server.timeout(req, 0)`），暂停读取的视频下载不再在 10 秒后被截断（58 MB 视频暂停 20 秒只收到不到 5 MB → 现在完整收到）；测试 `tests/stream-idle-timeout.test.ts`。本地 master 已合并、重编 `~/.local/bin/drop`（旧版留 `drop.bak-20260806`）并重启服务。
 - 上游合并后：`git fetch upstream && git merge upstream/master`（同样的改动从两边进来，Git 一般能干净处理），重跑 `scripts/verify.sh`，`systemctl --user restart drop.service`，并把本节移入 `CHANGELOG.md`。
 
 ### 2026-09-08 审阅遗留（按产品定位分级）
