@@ -4,15 +4,14 @@
 
 import { Hono } from 'hono';
 import { existsSync, statSync } from 'fs';
-import { basename } from 'path';
 import { lookupAuthorization } from '../../db/authorizations.js';
 import { resolveShareToken } from '../../db/share-aliases.js';
 import { STATUS_NOT_FOUND, STATUS_EXPIRED, MAX_RENDER_SIZE } from '../../shared/constants.js';
 import { getFileType } from '../../shared/fs.js';
 import { getRenderer } from '../render/index.js';
 import { handleExpired } from '../middleware/auth.js';
-import { guessMime } from '../../shared/mime.js';
 import { recordRouteAccess } from '../access-logging.js';
+import { rawFileResponse } from '../raw-response.js';
 import type { FileAuthorization } from '../../shared/types.js';
 
 const fileRoutes = new Hono();
@@ -62,94 +61,6 @@ function getFileAuth(c: any): { row: FileAuthorization | null; expiredHtml: stri
   }
 
   return { row: row!, expiredHtml: null, token, publicId };
-}
-
-// Types that a browser would execute/render if served inline on this origin.
-// Share URLs are public and same-origin with the owner-cookied /dashboard and
-// /revoke, so these must never be served as their real type + inline — force
-// a plain-text download instead. (Mirrors the fix applied to /d/:token/raw.)
-const UNSAFE_INLINE_TYPES = new Set(['text/html', 'application/xhtml+xml', 'image/svg+xml']);
-
-/**
- * Build a Content-Disposition header value that is safe for any filename.
- * Response headers must be Latin-1 and cannot contain quotes/backslashes/
- * control characters, so we emit an ASCII-sanitized `filename` fallback
- * alongside an RFC 5987 percent-encoded `filename*` for the real name.
- */
-function contentDispositionHeader(disposition: 'inline' | 'attachment', filename: string): string {
-  const asciiFallback = filename
-    .replace(/[^\x20-\x7e]/g, '_')
-    .replace(/["\\]/g, '_') || 'file';
-  const encoded = encodeURIComponent(filename).replace(/['()*!~]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
-  return `${disposition}; filename="${asciiFallback}"; filename*=UTF-8''${encoded}`;
-}
-
-/** Largest body returned for one Range request (see rawFileResponse). */
-const MAX_RANGE_CHUNK = 8 * 1024 * 1024;
-
-/**
- * Parse a single-range `Range: bytes=...` header against a file of `size`
- * bytes. Returns null when absent or not a single byte range (serve the whole
- * file), 'unsatisfiable' when it cannot be satisfied, else inclusive bounds.
- */
-function parseRange(header: string | undefined, size: number): { start: number; end: number } | 'unsatisfiable' | null {
-  if (!header) return null;
-  const m = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
-  if (!m || (m[1] === '' && m[2] === '')) return null;
-  let start: number;
-  let end: number;
-  if (m[1] === '') {
-    const n = parseInt(m[2], 10);
-    if (n === 0) return 'unsatisfiable';
-    start = Math.max(0, size - n);
-    end = size - 1;
-  } else {
-    start = parseInt(m[1], 10);
-    end = m[2] === '' ? size - 1 : Math.min(parseInt(m[2], 10), size - 1);
-  }
-  if (start >= size || start > end) return 'unsatisfiable';
-  return { start, end };
-}
-
-/**
- * Stream a file's bytes with the correct content type, an explicit
- * Content-Length and single-range support (206/416). Browser PDF viewers and
- * media players depend on these; Bun does not add them for a Response built
- * from Bun.file() with custom headers, and HEAD would otherwise report 0.
- */
-async function rawFileResponse(c: any, filepath: string): Promise<Response> {
-  const guessedMime = guessMime(filepath);
-  const unsafe = UNSAFE_INLINE_TYPES.has(guessedMime);
-  const contentType = unsafe ? 'text/plain; charset=utf-8' : guessedMime;
-  const disposition = unsafe ? 'attachment' : 'inline';
-  const file = Bun.file(filepath);
-  const size = file.size;
-  const headers: Record<string, string> = {
-    'Content-Type': contentType,
-    'Content-Disposition': contentDispositionHeader(disposition, basename(filepath)),
-    'Accept-Ranges': 'bytes',
-  };
-  const isHead = c.req.method === 'HEAD';
-  const range = parseRange(c.req.header('range'), size);
-
-  if (range === 'unsatisfiable') {
-    return new Response(null, { status: 416, headers: { ...headers, 'Content-Range': `bytes */${size}` } });
-  }
-  if (range) {
-    // Send ranged bodies as in-memory bytes so Bun emits an exact
-    // Content-Length (a streamed body is sent chunked, and Safari refuses to
-    // play media whose 206 responses are chunked). Cap each response at
-    // MAX_RANGE_CHUNK; returning a shorter range than an open-ended request
-    // asked for is allowed, and players request the next chunk.
-    const end = Math.min(range.end, range.start + MAX_RANGE_CHUNK - 1);
-    const length = end - range.start + 1;
-    const body = isHead ? null : new Uint8Array(await file.slice(range.start, end + 1).arrayBuffer());
-    return new Response(body, {
-      status: 206,
-      headers: { ...headers, 'Content-Range': `bytes ${range.start}-${end}/${size}`, 'Content-Length': String(length) },
-    });
-  }
-  return new Response(isHead ? null : file, { headers: { ...headers, 'Content-Length': String(size) } });
 }
 
 function serveFileHandler(c: any) {

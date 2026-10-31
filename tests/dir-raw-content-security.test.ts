@@ -10,12 +10,14 @@ function withTempDb(): string {
   closeDb();
   const root = mkdtempSync(join(tmpdir(), 'drop-raw-content-security-'));
   process.env.DROP_DB = join(root, 'drop.db');
+  process.env.DROP_CONFIG = join(root, 'config.json');
   return root;
 }
 
 afterEach(() => {
   closeDb();
   delete process.env.DROP_DB;
+  delete process.env.DROP_CONFIG;
 });
 
 describe('dir raw route content security', () => {
@@ -118,6 +120,49 @@ describe('dir raw route content security', () => {
       expect(res.status).toBe(200);
       expect(res.headers.get('Content-Type')).toBe('image/png');
       expect(res.headers.get('Content-Disposition')).toContain('inline');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  for (const [name, body] of [
+    ['evil.xml', '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><script>fetch("/dashboard")</script></html>'],
+    ['feed.XML', '<rss><channel/></rss>'],
+  ]) {
+    test(`serves ${name} as a sandboxed download, not an executable document`, async () => {
+      const root = withTempDb();
+      try {
+        const dir = join(root, 'share');
+        mkdirSync(dir);
+        writeFileSync(join(dir, name), body);
+        const { token } = addDirAuthorization(dir, 60, []);
+
+        const res = await app.request(`/d/${token}/raw?path=${name}`);
+
+        expect(res.status).toBe(200);
+        expect(res.headers.get('Content-Type')).toStartWith('text/plain');
+        expect(res.headers.get('Content-Type')).not.toContain('xml');
+        expect(res.headers.get('Content-Disposition')).toStartWith('attachment');
+        expect(res.headers.get('Content-Security-Policy')).toContain('sandbox');
+        expect(await res.text()).toBe(body);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+  }
+
+  test('a .docx in a directory share downloads with its Office type', async () => {
+    const root = withTempDb();
+    try {
+      const dir = join(root, 'share');
+      mkdirSync(dir);
+      writeFileSync(join(dir, 'report.docx'), 'PK fake docx');
+      const { token } = addDirAuthorization(dir, 60, []);
+
+      const res = await app.request(`/d/${token}/raw?path=report.docx`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Type')).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      expect(res.headers.get('Content-Disposition')).toStartWith('attachment');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

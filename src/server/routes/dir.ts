@@ -5,7 +5,7 @@
 
 import { Hono, type Context } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
-import { existsSync, statSync, readFileSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { lookupDirAuthorization } from '../../db/dir-authorizations.js';
 import { resolveShareToken } from '../../db/share-aliases.js';
@@ -18,8 +18,8 @@ import { jsSafeJson, isSafeSubpath } from '../../shared/utils.js';
 import { handleExpired, safeCompare, signAuthValue, verifyAuthValue } from '../middleware/auth.js';
 import { dirBrowserShellHtml } from '../render/html-templates.js';
 import { getRenderer } from '../render/index.js';
-import { guessMime } from '../../shared/mime.js';
 import { recordRouteAccess } from '../access-logging.js';
+import { rawFileResponse } from '../raw-response.js';
 import type { DirAuthorization } from '../../shared/types.js';
 import {
   DEFAULT_DIR_GIT_COMMIT_LIMIT,
@@ -35,22 +35,6 @@ import {
 const dirRoutes = new Hono();
 const DIR_GIT_HISTORY_COOKIE = 'drop_dir_git_history';
 const DIR_GIT_HISTORY_SCOPE = 'dir_git_history';
-
-// Bun's Response rejects header values containing bytes outside Latin-1, so a
-// bare `filename="${name}"` throws for any non-ASCII file name (and a raw `"`
-// would break out of the quoted string even when ASCII). Build an ASCII-only
-// fallback plus an RFC 5987 extended parameter carrying the full Unicode name.
-const RAW_FILENAME_ASCII_UNSAFE = /[^\x20-\x7e]|["\\]/g;
-const RAW_FILENAME_EXT_UNSAFE = /['()*!~]/g;
-
-function rawContentDisposition(kind: 'inline' | 'attachment', filename: string): string {
-  const fallback = filename.replace(RAW_FILENAME_ASCII_UNSAFE, '_');
-  const extended = encodeURIComponent(filename).replace(
-    RAW_FILENAME_EXT_UNSAFE,
-    (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase(),
-  );
-  return `${kind}; filename="${fallback}"; filename*=UTF-8''${extended}`;
-}
 
 interface DirGitHistoryUnlockPayload {
   token: string;
@@ -446,31 +430,10 @@ dirRoutes.get('/d/:token/raw', (c) => {
   const absPath = validateDirPath(row!.dirpath, relPath, excludes);
   if (!absPath) return c.text('Access denied', 403);
 
-  const guessedType = guessMime(absPath);
-  const isExecutableDocument =
-    guessedType === 'text/html' ||
-    guessedType === 'application/xhtml+xml' ||
-    guessedType === 'image/svg+xml';
+  if (!statSync(absPath).isFile()) return c.text('Not a file', 400);
 
-  const data = readFileSync(absPath);
   recordRouteAccess(c, row!.token, 'dir', 'raw_view', relPath);
-
-  if (isExecutableDocument) {
-    return new Response(data, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Content-Disposition': rawContentDisposition('attachment', basename(absPath)),
-        'Content-Security-Policy': 'sandbox',
-      },
-    });
-  }
-
-  return new Response(data, {
-    headers: {
-      'Content-Type': guessedType,
-      'Content-Disposition': rawContentDisposition('inline', basename(absPath)),
-    },
-  });
+  return rawFileResponse(c, absPath);
 });
 
 // Catch-all for deep links: /d/:token/* (MUST be last)
