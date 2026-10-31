@@ -12,9 +12,9 @@
 
 - 2026-09-07 合并 upstream/master（含 `38c107c` 分享排除规则套用到 commit diff、`bb608a4` 密钥扫描覆盖 served context 行两个安全修复），随后重启 `drop.service`；确认 daemon 仍从源码 `bun run src/cli/index.ts serve` 启动，`~/.drop` 权限保持 700。2026-09-08 复核：本地 master 对 upstream 0 落后，`scripts/verify.sh` 通过（88 pass / 0 fail / 394 expect）。
 
-### 2026-10-31 原始文件响应安全与一致性修复（本地未提交，未重启 `drop.service`）
+### 2026-10-31 原始文件响应安全与一致性修复（本地提交 `cdbf8b3`；上游 PR：junping1/drop#21 追加 `fe5a644`、#25 追加 `cd11449`）
 
-依据 `docs/archive/reviews/2026-10-31-近一周提交审阅.md` 的审阅结论。验证：`bun test` 全量通过、`bun run check` 通过（数字见归档文件「处理记录」）。
+依据 `docs/archive/reviews/2026-10-31-近一周提交审阅.md` 的审阅结论。`drop.service` 进程启动于 09:41 UTC，晚于各源码文件最后修改时间，线上已加载本节改动。上游拆分：XML 安全、raw 响应共用、Office 下载、HEAD/Range 不计数追加到 #21（同时 cherry-pick #20 的提交作前置）；超时收窄与 255 秒追加到 #25；两个 PR 的标题与正文已重写。验证：`bun test` 全量通过、`bun run check` 通过（数字见归档文件「处理记录」）。
 
 - 安全：`.xml`（以及 `text/xml`、所有 `+xml` 类型）不再内联直出。此前 XHTML 命名空间里带 `<script>` 的 XML 文件在 `/f/:token/raw`、`/d/:token/raw?path=`，以及超过 5 MB 时走 `/f/:token` 页面路由，都会作为同源文档执行，可读取 owner 的 `/dashboard`、`/api/stats`。新增 `isUnsafeInline()`（`src/shared/mime.ts`）统一判定 HTML/XHTML/XML/`+xml`，命中时一律 `text/plain` + `attachment` + `Content-Security-Policy: sandbox`；文件分享原先缺的 CSP 头一并补上。
 - 修复：文件分享和目录分享的原始字节改走同一个 `rawFileResponse()`（新文件 `src/server/raw-response.ts`）。目录 raw 因此补上 Range/206/416、`Accept-Ranges`、准确 `Content-Length`（HEAD 不再报 0）、流式输出（不再整文件 `readFileSync`），Office 等下载型类型在目录分享里也改为 `attachment`；目录 raw 请求子目录路径时返回 400 而不是 500。
