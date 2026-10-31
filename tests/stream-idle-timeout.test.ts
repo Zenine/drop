@@ -6,7 +6,7 @@ import { tmpdir } from 'os';
 import { closeDb } from '../src/db/index.js';
 import { addAuthorization } from '../src/db/authorizations.js';
 import { app } from '../src/server/index.js';
-import { createFetchHandler } from '../src/server/serve.js';
+import { createFetchHandler, STREAM_IDLE_TIMEOUT_SECONDS } from '../src/server/serve.js';
 
 // Video players stop reading once they have buffered enough. Bun.serve closes
 // a connection after `idleTimeout` seconds without writes (default 10 s), which
@@ -62,14 +62,35 @@ describe('file streams survive a paused reader', () => {
     }
   }, 30000);
 
-  test('non-file routes keep the server idle timeout', () => {
-    const calls: unknown[] = [];
+  test('only raw byte routes get the extended timeout, and it is finite', () => {
+    const calls: unknown[][] = [];
     const fakeServer = { timeout: (...a: unknown[]) => calls.push(a) } as any;
     const handler = createFetchHandler({ fetch: () => new Response('ok') } as any);
-    handler(new Request('http://drop.test/dashboard'), fakeServer);
-    expect(calls.length).toBe(0);
-    handler(new Request('http://drop.test/f/abc/raw'), fakeServer);
-    handler(new Request('http://drop.test/d/abc/raw/x.mp4'), fakeServer);
-    expect(calls.length).toBe(2);
+    const byteRoutes = [
+      'http://drop.test/f/abc',
+      'http://drop.test/f/abc/raw',
+      'http://drop.test/f/abc/clip.mp4',
+      'http://drop.test/d/abc/raw?path=x.mp4',
+    ];
+    const otherRoutes = [
+      'http://drop.test/dashboard',
+      'http://drop.test/api/stats',
+      'http://drop.test/d/abc',
+      'http://drop.test/d/abc/api/tree',
+      'http://drop.test/d/abc/api/file?path=x.mp4',
+      'http://drop.test/d/abc/api/git/unlock',
+      'http://drop.test/d/abc/sub/x.mp4',
+      'http://drop.test/d/abc/raw/x.mp4',
+      'http://drop.test/f/abc/raw/extra',
+      'http://drop.test/git/abc',
+    ];
+    for (const url of otherRoutes) handler(new Request(url), fakeServer);
+    expect(calls).toEqual([]);
+    for (const url of byteRoutes) handler(new Request(url), fakeServer);
+    expect(calls.length).toBe(byteRoutes.length);
+    for (const [, seconds] of calls) {
+      expect(seconds).toBe(STREAM_IDLE_TIMEOUT_SECONDS);
+      expect(seconds as number).toBeGreaterThan(0);
+    }
   });
 });
