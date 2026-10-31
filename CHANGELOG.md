@@ -12,6 +12,18 @@
 
 - 2026-09-07 合并 upstream/master（含 `38c107c` 分享排除规则套用到 commit diff、`bb608a4` 密钥扫描覆盖 served context 行两个安全修复），随后重启 `drop.service`；确认 daemon 仍从源码 `bun run src/cli/index.ts serve` 启动，`~/.drop` 权限保持 700。2026-09-08 复核：本地 master 对 upstream 0 落后，`scripts/verify.sh` 通过（88 pass / 0 fail / 394 expect）。
 
+### 2026-10-31 原始文件响应安全与一致性修复（本地未提交，未重启 `drop.service`）
+
+依据 `docs/archive/reviews/2026-10-31-近一周提交审阅.md` 的审阅结论。验证：`bun test` 全量通过、`bun run check` 通过（数字见归档文件「处理记录」）。
+
+- 安全：`.xml`（以及 `text/xml`、所有 `+xml` 类型）不再内联直出。此前 XHTML 命名空间里带 `<script>` 的 XML 文件在 `/f/:token/raw`、`/d/:token/raw?path=`，以及超过 5 MB 时走 `/f/:token` 页面路由，都会作为同源文档执行，可读取 owner 的 `/dashboard`、`/api/stats`。新增 `isUnsafeInline()`（`src/shared/mime.ts`）统一判定 HTML/XHTML/XML/`+xml`，命中时一律 `text/plain` + `attachment` + `Content-Security-Policy: sandbox`；文件分享原先缺的 CSP 头一并补上。
+- 修复：文件分享和目录分享的原始字节改走同一个 `rawFileResponse()`（新文件 `src/server/raw-response.ts`）。目录 raw 因此补上 Range/206/416、`Accept-Ranges`、准确 `Content-Length`（HEAD 不再报 0）、流式输出（不再整文件 `readFileSync`），Office 等下载型类型在目录分享里也改为 `attachment`；目录 raw 请求子目录路径时返回 400 而不是 500。
+- 修复：HEAD 请求忽略 Range（RFC 9110 §14.2），返回 200 和整文件长度；`Range` 单位大小写不敏感（`Bytes=` 生效）；支持 `If-Range`，响应新增 `ETag`、`Last-Modified`，校验值不匹配时回 200 整文件，避免断点续传拼接新旧两版文件。
+- 修复：空闲超时只对可能返回原始字节的路径（`/f/:token`、`/f/:token/raw`、`/f/:token/:filename`、`/d/:token/raw`）放宽，且从“无超时（0）”改为 255 秒（Bun 1.3.14 请求级超时实测上限，填 600 也会在约 256 秒断开）；目录页面、目录 API、git 解锁接口等恢复默认超时。
+- 修复：HEAD 请求和起点不为 0 的 Range 请求（播放器拖动/缓冲、后缀区间）不再记为访问事件，一次播放不会被统计成多次浏览。
+- 新增：`.docx/.xlsx/.pptx/.doc/.xls/.ppt` 识别为对应 Office 类型，与压缩包、未知二进制一起以 `attachment` 下载（`DOWNLOAD_ONLY_TYPES`）。
+- 测试：`tests/mime.test.ts` 表驱动覆盖 `isUnsafeInline` 与 Office 类型；`tests/file-raw-range.test.ts` 对 `/f/:token`、`/f/:token/raw`、`/d/:token/raw?path=` 三条路由参数化，覆盖 `bytes=-0`、反向区间、多段、空文件、大写单位、末尾截断、HEAD+Range、If-Range，真实套接字测试改用 9 MiB 文件断言 8 MiB 截断；`tests/file-render-size.test.ts`、`tests/dir-raw-content-security.test.ts` 补 XML 与 `.docx` 路由用例；`tests/stream-idle-timeout.test.ts` 改用真实路由形态并断言 API/页面不放宽超时；`tests/access-logging-routes.test.ts` 补 HEAD/Range 不计数用例。上述测试文件同时把 `DROP_CONFIG` 指向临时文件，避免写真实配置。
+
 ### 新增
 
 - Git 仓库目录分享页面新增 Owner unlock，可在当前分享范围内用 owner key 临时解锁到最近 100 条 commit，解锁随分享过期失效。

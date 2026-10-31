@@ -20,6 +20,7 @@
 - [ ] junping1/drop#23 `pr/build-host-target`：`scripts/build.ts` 默认目标按宿主平台推断（`build-release.ts` 保持显式四目标不变）。
 - [ ] junping1/drop#24 `pr/git-commit-shares`：合并提交页面不再空白（`diff-tree` 支持合并并按路径去重），commit 密钥扫描补敏感文件名规则与字节上限。
 - [ ] junping1/drop#25 `pr/stream-idle-timeout`（2026-10-27）：`/f/`、`/d/` 分享请求取消 Bun 空闲超时（`server.timeout(req, 0)`），暂停读取的视频下载不再在 10 秒后被截断（58 MB 视频暂停 20 秒只收到不到 5 MB → 现在完整收到）；测试 `tests/stream-idle-timeout.test.ts`。本地 master 已合并、重编 `~/.local/bin/drop`（旧版留 `drop.bak-20260806`）并重启服务。
+- [ ] 待开 PR（2026-10-31，本地未提交）：原始文件响应安全与一致性修复——XML/`+xml` 同源执行（**安全，对外：需提上游**）、目录 raw 共用 `rawFileResponse`（Range/HEAD/Office 下载）、HEAD 忽略 Range、`If-Range`、超时收窄到原始字节路径并改为 255 秒、HEAD/续传 Range 不计浏览量，以及 Office 类型下载。详见 `CHANGELOG.md` 2026-10-31 小节与 `docs/archive/reviews/2026-10-31-近一周提交审阅.md`「处理记录」。下一步：由用户决定是否提交与重启 `drop.service`（线上从源码跑，重启后才生效）；按 `docs/workflows/upstream-fix-pr.md` 基于 `upstream/master` 拆分支提 PR（建议拆为 XML 安全一条、raw 响应统一+Range 一条、超时一条；超时一条与 #25 冲突，可改为追加到 #25），并同步更正 #21、#25 的 PR 正文（#21 正文仍写 Range 无测试；#25 正文写“API 保持默认”与旧实现不符）。
 - 上游合并后：`git fetch upstream && git merge upstream/master`（同样的改动从两边进来，Git 一般能干净处理），重跑 `scripts/verify.sh`，`systemctl --user restart drop.service`，并把本节移入 `CHANGELOG.md`。
 
 ### 2026-09-08 审阅遗留（按产品定位分级）
@@ -32,7 +33,6 @@
 
 - [ ] `~/.local/bin/drop` 是 2026-08-06 的旧二进制，早于所有修复；本地已含 #23，直接 `bun run scripts/build.ts`（默认即宿主平台，产物 `dist/drop-linux-arm64`）后复制替换，或删掉 `drop-preview` 软链避免误用。
 - [ ] `PID_PATH` 没有环境变量覆盖，`tests/cli-slug.test.ts` 仍会快照并还原真实 `~/.drop/drop.pid`；`ensureStateDir()` 也仍会创建 `~/.drop`。#19 已把配置这条路堵死，pid 这条留作后续。
-- [ ] `/f/:token/raw` 的 Range 支持来自 `Bun.file()`，没有测试覆盖。
 
 
 明确不做（与单用户自用工具定位不匹配，记录以免反复翻出）：owner/auth cookie 服务端过期与 `secure`、`/dashboard?key=` 改 POST、`next` 开放重定向、pid 复用误杀、stdin 空输入、`--ttl` 非数字校验、`--exclude` 变参、符号链接绕过排除、CommitsTab 切换重置、面包屑无效、搜索大小写、Google Fonts 外链、`install.sh` 原子写入。

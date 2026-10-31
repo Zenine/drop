@@ -5,7 +5,7 @@
 
 import { Hono, type Context } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
-import { existsSync, statSync, readFileSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { lookupDirAuthorization } from '../../db/dir-authorizations.js';
 import { resolveShareToken } from '../../db/share-aliases.js';
@@ -18,9 +18,8 @@ import { jsSafeJson, isSafeSubpath } from '../../shared/utils.js';
 import { handleExpired, safeCompare, signAuthValue, verifyAuthValue } from '../middleware/auth.js';
 import { dirBrowserShellHtml } from '../render/html-templates.js';
 import { getRenderer } from '../render/index.js';
-import { guessMime } from '../../shared/mime.js';
 import { recordRouteAccess } from '../access-logging.js';
-import { contentDisposition } from '../content-disposition.js';
+import { rawFileResponse } from '../raw-response.js';
 import type { DirAuthorization } from '../../shared/types.js';
 import {
   DEFAULT_DIR_GIT_COMMIT_LIMIT,
@@ -430,32 +429,10 @@ dirRoutes.get('/d/:token/raw', (c) => {
   const excludes = getExcludes(row!);
   const absPath = validateDirPath(row!.dirpath, relPath, excludes);
   if (!absPath) return c.text('Access denied', 403);
+  if (!statSync(absPath).isFile()) return c.text('Not a file', 400);
 
-  const guessedType = guessMime(absPath);
-  const isExecutableDocument =
-    guessedType === 'text/html' ||
-    guessedType === 'application/xhtml+xml' ||
-    guessedType === 'image/svg+xml';
-
-  const data = readFileSync(absPath);
   recordRouteAccess(c, row!.token, 'dir', 'raw_view', relPath);
-
-  if (isExecutableDocument) {
-    return new Response(data, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Content-Disposition': contentDisposition('attachment', basename(absPath)),
-        'Content-Security-Policy': 'sandbox',
-      },
-    });
-  }
-
-  return new Response(data, {
-    headers: {
-      'Content-Type': guessedType,
-      'Content-Disposition': contentDisposition('inline', basename(absPath)),
-    },
-  });
+  return rawFileResponse(c, absPath);
 });
 
 // Catch-all for deep links: /d/:token/* (MUST be last)

