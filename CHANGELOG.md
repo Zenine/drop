@@ -4,9 +4,15 @@
 
 ## Unreleased
 
+- 2026-11-14 将限流桶封装到中间件实例中，应用仍使用原有共享实例及每分钟 300 次限制；代理信任测试使用独立实例，避免耗尽 localhost 桶后污染其它全量测试。补充独立实例互不影响、原实例仍拒绝超限请求的回归。
+
 验证：2026-05-26 在本机运行 `scripts/verify.sh` 通过，包含 `tsc --noEmit`、`bun test`（78 pass / 0 fail，361 expect() calls）和 `bun run scripts/build.ts`。2026-05-19 另完成本地二进制、线上 `template` / `writing-craft` 页面截图验证、slug、密钥扫描、QR 输出和访问统计冒烟测试。
 
 ### 运维
+
+- 2026-10-27 按用户确认关闭备用分享域名 DNS 排查待办：不使用 `share.neat-packaging.com`（主域解析在 DNSPod，当前隧道方案不支持），统一使用 `share.niaite.com`；已在 TODO 中保留域名使用约定。本次只更新文档，没有修改 DNS 或隧道配置。
+
+- 2026-10-27 完成 Intel Mac named tunnel 的 cloudflared 运行时更新：Homebrew 已安装 2026.10.3，随后通过用户级 launchctl 重启原有服务，使旧的 2026.5.2 进程切换到新版。没有卸载服务或修改凭证；本机启动日志与 Cloudflare 隧道详情均确认 2026.10.3，后台报告 darwin_amd64，4 条连接注册正常，主分享域名 HTTPS 返回 200。仅更新运维记录，未运行应用代码测试。
 
 - 2026-09-09 将第二批修复（junping1/drop#19–#24）合并进本地 master 并重启 `drop.service`。合并冲突三处：`secret-scan.ts` 中 #24 把 `runGit` 换成返回 Buffer 的 `runGitBuffer`，与本地 #14 的 `getCommitDiff` 不兼容，已统一走 Buffer 并同时保留“扫描与渲染同源的 diff”和“字节上限 + 截断提示”；`dir.ts`、`file.ts` 中 #20/#21 因上游缺少 #16 的共享 `contentDisposition` 而各自自建了语义等价实现，已统一到共享 helper 并删除重复。验证：`scripts/verify.sh` 通过（163 pass / 0 fail / 578 expect），构建产物为 `dist/drop-linux-arm64`（本机可执行）。重启后线上实测：目录 raw 对 `.html` 返回 `text/plain` + `attachment` + CSP sandbox；含中文、空格和 `%` 的文件名返回 200 且 `filename*` 正确；畸形转义路径返回 400；6 MB `.log` 走流式 raw，20 毫秒返回。
 

@@ -37,7 +37,9 @@
 
 明确不做（与单用户自用工具定位不匹配，记录以免反复翻出）：owner/auth cookie 服务端过期与 `secure`、`/dashboard?key=` 改 POST、`next` 开放重定向、pid 复用误杀、stdin 空输入、`--ttl` 非数字校验、`--exclude` 变参、符号链接绕过排除、CommitsTab 切换重置、面包屑无效、搜索大小写、Google Fonts 外链、`install.sh` 原子写入。
 
-另一台 Mac（2026-09-08 报来的日志）确认的现象与对应修复：中文文件名 PDF 触发 `TypeError: Header ... has invalid value` → #16；17173 端口反复 EADDRINUSE、pid 文件被抹 → #17；`drop.log` 里 `drop serving on http://0.0.0.0:17173` → #18。三条均已在本机复现。Mac 侧还需自行处理（不属 drop 代码）：删除 `~/.drop/drop.pid.agent-start=*`（非 drop 写入）、卸载常驻的 quick tunnel 只留 named tunnel、升级 cloudflared 2026.5.2 → 2026.8.3 并给 stderr 加日志轮转。
+另一台 Mac（2026-09-08 报来的日志）确认的现象与对应修复：中文文件名 PDF 触发 `TypeError: Header ... has invalid value` → #16；17173 端口反复 EADDRINUSE、pid 文件被抹 → #17；`drop.log` 里 `drop serving on http://0.0.0.0:17173` → #18。三条均已在本机复现。Mac 侧还需自行处理（不属 drop 代码）：删除 `~/.drop/drop.pid.agent-start=*`（非 drop 写入）、卸载常驻的 quick tunnel 只留 named tunnel、给 stderr 加日志轮转。cloudflared 升级与 named tunnel 重启已于 2026-10-27 完成，见 `CHANGELOG.md`。
+
+域名使用约定（2026-10-27，用户确认）：不使用 `share.neat-packaging.com`（主域解析在 DNSPod，当前隧道方案不支持），统一用 `share.niaite.com`。原备用域名 DNS 排查事项关闭，不再作为待办。
 
 流程文档：本轮「审阅 → 分级 → 提上游 PR」的可复用步骤记在 `docs/workflows/upstream-fix-pr.md`，下次同类任务先读该文件。
 

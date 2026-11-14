@@ -1,13 +1,13 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Context } from 'hono';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { rateLimitMiddleware } from '../src/server/middleware/rate-limit.js';
+import { createRateLimitMiddleware } from '../src/server/middleware/rate-limit.js';
 import { saveConfig } from '../src/shared/config.js';
 
-// These tests exercise the real module-level rate limiter, so each test uses
-// IP addresses unique to itself to avoid cross-test/cross-file bucket sharing.
+// Each test exercises a fresh production limiter so localhost buckets cannot
+// leak into other tests or the application singleton.
 //
 // Config-based cases point DROP_CONFIG at an isolated temp file so they never
 // read or write the real user config at ~/.drop/config.json.
@@ -33,6 +33,8 @@ async function hitMany(headers: Record<string, string>, count: number): Promise<
 }
 
 let tempRoot: string | null = null;
+let rateLimitMiddleware: ReturnType<typeof createRateLimitMiddleware>;
+beforeEach(() => { rateLimitMiddleware = createRateLimitMiddleware(); });
 
 afterEach(() => {
   delete process.env.DROP_TRUST_PROXY;
@@ -44,6 +46,16 @@ afterEach(() => {
 });
 
 describe('rate limiting proxy trust', () => {
+  test('separate limiter instances do not share exhausted localhost buckets', async () => {
+    tempRoot = mkdtempSync(join(tmpdir(), 'drop-config-isolated-'));
+    process.env.DROP_CONFIG = join(tempRoot, 'config.json');
+    delete process.env.DROP_TRUST_PROXY;
+    const blocked = await hitMany({}, 301);
+    expect((blocked as Response).status).toBe(429);
+    const independent = createRateLimitMiddleware();
+    expect(await independent(contextWithHeaders({}), async () => {})).toBeUndefined();
+    expect((await hit({}) as Response).status).toBe(429);
+  });
   test('env-only trust gives independent buckets per client IP', async () => {
     process.env.DROP_TRUST_PROXY = '1';
     const headersA = { 'cf-connecting-ip': '203.0.113.201' };
