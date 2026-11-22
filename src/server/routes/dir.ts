@@ -19,7 +19,7 @@ import { handleExpired, safeCompare, signAuthValue, verifyAuthValue } from '../m
 import { dirBrowserShellHtml } from '../render/html-templates.js';
 import { getRenderer } from '../render/index.js';
 import { recordRouteAccess } from '../access-logging.js';
-import { rawFileResponse } from '../raw-response.js';
+import { isPreviewableHtml, rawFileResponse, renderHtmlResponse } from '../raw-response.js';
 import type { DirAuthorization } from '../../shared/types.js';
 import {
   DEFAULT_DIR_GIT_COMMIT_LIMIT,
@@ -403,7 +403,11 @@ dirRoutes.get('/d/:token/api/file', (c) => {
     if (renderer) {
       const htmlContent = renderer(absPath);
       recordRouteAccess(c, row!.token, 'dir', 'api_preview', relPath);
-      return c.json({ type: 'html', content: htmlContent, size: fileSize, mtime: fileMtime });
+      // HTML files also offer a sandboxed live preview (see /render below).
+      const renderUrl = isPreviewableHtml(absPath)
+        ? `${baseUrl}/d/${c.req.param('token')}/render?path=${encodeURIComponent(relPath)}`
+        : undefined;
+      return c.json({ type: 'html', content: htmlContent, size: fileSize, mtime: fileMtime, ...(renderUrl ? { render_url: renderUrl } : {}) });
     }
   }
 
@@ -417,8 +421,11 @@ dirRoutes.get('/d/:token/api/file', (c) => {
   return c.json({ type: 'binary', filename: basename(absPath), size: fileSize, mtime: fileMtime, url: rawUrl });
 });
 
-// Raw file serving
-dirRoutes.get('/d/:token/raw', (c) => {
+/**
+ * Authorization, expiry and path checks shared by the byte-serving routes
+ * (/raw and /render). Returns either an early Response or the approved file.
+ */
+function resolveDirFileRequest(c: Context): Response | { absPath: string; relPath: string; row: DirAuthorization } {
   const { row, expiredHtml } = getDirAuth(c);
   if (!row && !expiredHtml) return c.text('Not found', 404);
   if (expiredHtml) return c.text('Expired', 403);
@@ -432,8 +439,26 @@ dirRoutes.get('/d/:token/raw', (c) => {
 
   if (!statSync(absPath).isFile()) return c.text('Not a file', 400);
 
-  recordRouteAccess(c, row!.token, 'dir', 'raw_view', relPath);
-  return rawFileResponse(c, absPath);
+  return { absPath, relPath, row: row! };
+}
+
+// Raw file serving
+dirRoutes.get('/d/:token/raw', (c) => {
+  const resolved = resolveDirFileRequest(c);
+  if (resolved instanceof Response) return resolved;
+
+  recordRouteAccess(c, resolved.row.token, 'dir', 'raw_view', resolved.relPath);
+  return rawFileResponse(c, resolved.absPath);
+});
+
+// Live HTML for the sandboxed preview iframe (CSP sandbox allow-scripts)
+dirRoutes.get('/d/:token/render', (c) => {
+  const resolved = resolveDirFileRequest(c);
+  if (resolved instanceof Response) return resolved;
+
+  const res = renderHtmlResponse(c, resolved.absPath);
+  if (res.status === 200) recordRouteAccess(c, resolved.row.token, 'dir', 'raw_view', resolved.relPath);
+  return res;
 });
 
 // Catch-all for deep links: /d/:token/* (MUST be last)

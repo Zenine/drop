@@ -1,12 +1,13 @@
 /**
  * Raw byte responses shared by file shares (/f/:token, /f/:token/raw) and
- * directory shares (/d/:token/raw?path=). Callers do authorization, expiry and
+ * directory shares (/d/:token/raw?path=), plus the sandboxed HTML render
+ * responses (/f/:token/render, /d/:token/render?path=). Callers do authorization, expiry and
  * path validation first; this module only turns an already-approved absolute
  * path into a Response.
  */
 
 import { statSync } from 'fs';
-import { basename } from 'path';
+import { basename, extname } from 'path';
 import type { Context } from 'hono';
 import { DOWNLOAD_ONLY_TYPES, guessMime, isUnsafeInline } from '../shared/mime.js';
 
@@ -23,6 +24,7 @@ function contentDisposition(disposition: 'inline' | 'attachment', filename: stri
   const encoded = encodeURIComponent(filename).replace(/['()*!~]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
   return `${disposition}; filename="${asciiFallback}"; filename*=UTF-8''${encoded}`;
 }
+import { MAX_RENDER_SIZE } from '../shared/constants.js';
 
 /** Largest body returned for one Range request (see rawFileResponse). */
 export const MAX_RANGE_CHUNK = 8 * 1024 * 1024;
@@ -122,4 +124,49 @@ export async function rawFileResponse(c: Context, absPath: string): Promise<Resp
     });
   }
   return new Response(isHead ? null : file, { headers: { ...headers, 'Content-Length': String(size) } });
+}
+
+/**
+ * CSP for rendered HTML previews: scripts may run, but the document gets an
+ * opaque origin (no allow-same-origin), so it cannot read drop's cookies,
+ * call owner endpoints with credentials, or reach other shares' pages.
+ */
+export const HTML_PREVIEW_CSP = 'sandbox allow-scripts';
+
+const HTML_PREVIEW_EXTS = new Set(['.html', '.htm']);
+
+/**
+ * Whether a file can be shown through a render route: an .html/.htm file no
+ * larger than MAX_RENDER_SIZE. Oversized files only get source/download.
+ */
+export function htmlPreviewStatus(absPath: string): 'ok' | 'not_html' | 'too_large' {
+  if (!HTML_PREVIEW_EXTS.has(extname(absPath).toLowerCase())) return 'not_html';
+  if (statSync(absPath).size > MAX_RENDER_SIZE) return 'too_large';
+  return 'ok';
+}
+
+export function isPreviewableHtml(absPath: string): boolean {
+  return htmlPreviewStatus(absPath) === 'ok';
+}
+
+/**
+ * Serve an already-authorized HTML file as a live document for the sandboxed
+ * preview iframe. The sandbox CSP also applies when the URL is opened
+ * top-level, so the page never runs with drop's origin.
+ */
+export function renderHtmlResponse(c: Context, absPath: string): Response {
+  const status = htmlPreviewStatus(absPath);
+  if (status === 'not_html') return c.text('Preview not available for this file type', 404);
+  if (status === 'too_large') return c.text('File too large to preview', 413);
+
+  const size = statSync(absPath).size;
+  return new Response(c.req.method === 'HEAD' ? null : Bun.file(absPath), {
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Disposition': contentDisposition('inline', basename(absPath)),
+      'Content-Security-Policy': HTML_PREVIEW_CSP,
+      'Content-Length': String(size),
+      'Cache-Control': 'no-cache',
+    },
+  });
 }
