@@ -131,7 +131,7 @@ export async function rawFileResponse(c: Context, absPath: string): Promise<Resp
  * opaque origin (no allow-same-origin), so it cannot read drop's cookies,
  * call owner endpoints with credentials, or reach other shares' pages.
  */
-export const HTML_PREVIEW_CSP = 'sandbox allow-scripts';
+export const HTML_PREVIEW_CSP = 'sandbox allow-scripts allow-forms';
 
 const HTML_PREVIEW_EXTS = new Set(['.html', '.htm']);
 

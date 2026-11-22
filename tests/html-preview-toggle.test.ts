@@ -43,7 +43,7 @@ function expectSandboxedHtml(res: Response): void {
   expect(res.status).toBe(200);
   expect(res.headers.get('Content-Type')).toContain('text/html');
   const csp = res.headers.get('Content-Security-Policy') || '';
-  expect(csp).toContain('sandbox allow-scripts');
+  expect(csp).toContain('sandbox allow-scripts allow-forms');
   expect(csp).not.toContain('allow-same-origin');
   expect(csp).not.toContain('allow-top-navigation');
   expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
@@ -174,7 +174,7 @@ describe('file share HTML page toggle', () => {
       expect(html).toContain('class="view-toggle"');
       expect(html).toContain(`src="/f/${token}/render"`);
       const attrs = sandboxAttrs(html);
-      expect(attrs).toEqual(['allow-scripts']);
+      expect(attrs).toEqual(['allow-scripts allow-forms']);
       expect(html).not.toContain('allow-same-origin');
       expect(html).not.toContain('allow-top-navigation');
       expect(html).not.toContain('allow-popups-to-escape-sandbox');
@@ -338,9 +338,9 @@ describe('directory browser HTML preview UI', () => {
     expect(preview).toContain('view-toggle');
   });
 
-  test('HTML render iframe is sandboxed with allow-scripts only', () => {
+  test('HTML render iframe is sandboxed with allow-scripts and allow-forms only', () => {
     const source = readFileSync(join(componentsDir, 'HtmlRenderPreview.svelte'), 'utf-8');
-    expect(sandboxAttrs(source)).toEqual(['allow-scripts']);
+    expect(sandboxAttrs(source)).toEqual(['allow-scripts allow-forms']);
     expect(source).not.toContain('allow-same-origin');
     expect(source).not.toContain('allow-top-navigation');
     expect(source).not.toContain('allow-popups-to-escape-sandbox');
