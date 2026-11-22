@@ -77,7 +77,7 @@ ${opts.body}
 
 /**
  * Preview/Source toggle for HTML file pages. The preview is an iframe on the
- * render route with sandbox="allow-scripts" only: never allow-same-origin,
+ * render route with sandbox="allow-scripts allow-forms" only: never allow-same-origin,
  * so shared scripts cannot reach drop's origin.
  */
 export interface HtmlPreviewToggle {
@@ -222,7 +222,7 @@ function codePageWithToggleBody(opts: CodePageOpts, t: HtmlPreviewToggle): strin
     // The page fills the viewport; the iframe takes all space below the header.
     return `
   <div class="html-preview-page">${header}
-    <iframe class="html-preview-frame" sandbox="allow-scripts" src="${attr(t.renderUrl)}" title="${attr(opts.displayPath)}"></iframe>
+    <iframe class="html-preview-frame" sandbox="allow-scripts allow-forms" src="${attr(t.renderUrl)}" title="${attr(opts.displayPath)}"></iframe>
   </div>`;
   }
   return `${header}

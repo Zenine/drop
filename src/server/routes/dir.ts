@@ -450,7 +450,7 @@ dirRoutes.get('/d/:token/raw', (c) => {
   return rawFileResponse(c, resolved.absPath);
 });
 
-// Live HTML for the sandboxed preview iframe (CSP sandbox allow-scripts)
+// Live HTML for the sandboxed preview iframe (CSP sandbox allow-scripts allow-forms)
 dirRoutes.get('/d/:token/render', (c) => {
   const resolved = resolveDirFileRequest(c);
   if (resolved instanceof Response) return resolved;

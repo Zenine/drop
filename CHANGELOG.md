@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- 2026-11-22 HTML 预览沙箱加 `allow-forms`，带表单的页面（如口令解锁）在预览中可提交；仍不含 `allow-same-origin`。
 - 2026-11-22 新增 HTML 分享「Source / Preview」切换：`/f/:token/render`、`/d/:token/render?path=` 以 `CSP: sandbox allow-scripts` 返回 HTML，页面用 `sandbox="allow-scripts"` iframe 预览（支持 `?view=preview`），raw 路由不变（分支 `pr/html-preview-toggle`）。
 - 2026-11-14 将限流桶封装到中间件实例中，应用仍使用原有共享实例及每分钟 300 次限制；代理信任测试使用独立实例，避免耗尽 localhost 桶后污染其它全量测试。补充独立实例互不影响、原实例仍拒绝超限请求的回归。
 
