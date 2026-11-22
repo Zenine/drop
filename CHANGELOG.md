@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- 2026-11-22 新增 HTML 分享「Source / Preview」切换：`/f/:token/render`、`/d/:token/render?path=` 以 `CSP: sandbox allow-scripts` 返回 HTML，页面用 `sandbox="allow-scripts"` iframe 预览（支持 `?view=preview`），raw 路由不变（分支 `pr/html-preview-toggle`）。
 - 2026-11-14 将限流桶封装到中间件实例中，应用仍使用原有共享实例及每分钟 300 次限制；代理信任测试使用独立实例，避免耗尽 localhost 桶后污染其它全量测试。补充独立实例互不影响、原实例仍拒绝超限请求的回归。
 
 验证：2026-05-26 在本机运行 `scripts/verify.sh` 通过，包含 `tsc --noEmit`、`bun test`（78 pass / 0 fail，361 expect() calls）和 `bun run scripts/build.ts`。2026-05-19 另完成本地二进制、线上 `template` / `writing-craft` 页面截图验证、slug、密钥扫描、QR 输出和访问统计冒烟测试。
