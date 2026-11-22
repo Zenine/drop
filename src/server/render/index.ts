@@ -10,7 +10,7 @@ import { htmlEscape } from '../../shared/utils.js';
 import { renderCode, highlightCode, getHighlightCss } from './code.js';
 import { renderMarkdown } from './markdown.js';
 import { renderCsv } from './csv.js';
-import { mediaPageHtml } from './html-templates.js';
+import { mediaPageHtml, type HtmlPreviewToggle } from './html-templates.js';
 
 export { highlightCode, getHighlightCss } from './code.js';
 
@@ -20,7 +20,15 @@ const AUDIO_EXTS = new Set(['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.o
  * Get rendered HTML for a file, or null if it should be served raw.
  * Returns null for images, PDFs, and unknown binary files.
  */
-export function getRenderer(filepath: string): ((filepath: string, head?: number | null, tail?: number | null, rawUrl?: string) => string) | null {
+export type Renderer = (
+  filepath: string,
+  head?: number | null,
+  tail?: number | null,
+  rawUrl?: string,
+  htmlPreview?: HtmlPreviewToggle,
+) => string;
+
+export function getRenderer(filepath: string): Renderer | null {
   const fileType = getFileType(filepath);
 
   switch (fileType) {
