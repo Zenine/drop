@@ -20,7 +20,7 @@
 - [ ] junping1/drop#23 `pr/build-host-target`：`scripts/build.ts` 默认目标按宿主平台推断（`build-release.ts` 保持显式四目标不变）。
 - [ ] junping1/drop#24 `pr/git-commit-shares`：合并提交页面不再空白（`diff-tree` 支持合并并按路径去重），commit 密钥扫描补敏感文件名规则与字节上限。
 - [ ] junping1/drop#25 `pr/stream-idle-timeout`（2026-10-27）：`/f/`、`/d/` 分享请求取消 Bun 空闲超时（`server.timeout(req, 0)`），暂停读取的视频下载不再在 10 秒后被截断（58 MB 视频暂停 20 秒只收到不到 5 MB → 现在完整收到）；测试 `tests/stream-idle-timeout.test.ts`。本地 master 已合并、重编 `~/.local/bin/drop`（旧版留 `drop.bak-20260806`）并重启服务。2026-10-31 追加提交 `cd11449`（对应本地 `cdbf8b3` 的超时部分）：放宽范围收窄到原始字节路径（`/f/:token`、`/f/:token/:filename`、`/f/:token/raw`、`/d/:token/raw`），超时从 0 改为 255 秒；PR 正文已重写（旧正文“API 保持默认”与旧实现不符）。
-- [ ] `pr/html-preview-toggle`（2026-11-22）：HTML 分享的沙箱预览 / 源码切换，已合入本地 master 并重编 `~/.local/bin/drop`，尚未向上游提 PR；设计见 `docs/superpowers/specs/2026-11-22-html-preview-toggle-design.md`。
+- [ ] `pr/html-preview-toggle`（2026-11-22）：HTML 分享的沙箱预览 / 源码切换，已合入本地 master 并重编 `~/.local/bin/drop`；上游 PR junping1/drop#26（分支 `pr/html-preview`，stacks on #21，#21 合并后 diff 只剩两个提交）；设计见 `docs/superpowers/specs/2026-11-22-html-preview-toggle-design.md`。
 - 合并顺序提示：#21 含 #20 的提交，两者都开着；#25 的路径正则已匹配 #21 才新增的 `/f/:token/raw`，单独合并也无副作用。
 - 上游合并后：`git fetch upstream && git merge upstream/master`（同样的改动从两边进来，Git 一般能干净处理），重跑 `scripts/verify.sh`，`systemctl --user restart drop.service`，并把本节移入 `CHANGELOG.md`。
 
